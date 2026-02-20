@@ -1,0 +1,1 @@
+"""CryptoOracle application package."""
