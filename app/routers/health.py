@@ -18,8 +18,11 @@ def health_check(db: Session = Depends(get_db)):
     except Exception as e:
         db_status = f"error: {str(e)}"
 
+    from app.main import BUILD_TIMESTAMP
+
     return {
         "status": "ok" if db_status == "connected" else "degraded",
         "database": db_status,
         "version": "0.1.0",
+        "build": BUILD_TIMESTAMP,
     }

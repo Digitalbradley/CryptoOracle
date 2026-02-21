@@ -32,6 +32,8 @@ async def lifespan(app: FastAPI):
     logger.info("CryptoOracle shutting down")
 
 
+BUILD_TIMESTAMP = "2026-02-21T20:00:00Z"
+
 app = FastAPI(
     title="CryptoOracle",
     description="Esoteric Crypto Trading Intelligence Platform",
