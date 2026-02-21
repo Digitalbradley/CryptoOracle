@@ -21,6 +21,7 @@ pandas>=2.1
 numpy>=1.25
 
 # Astronomy / Ephemeris
+ephem>=4.1
 # pyswisseph>=2.10  # Uncomment after installing C compiler or use conda
 
 # Scheduling
