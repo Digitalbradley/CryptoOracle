@@ -18,8 +18,9 @@ from app.models.price_data import PriceData
 
 logger = logging.getLogger(__name__)
 
-# Binance public API — no keys required for OHLCV
-_exchange = ccxt.binance({"enableRateLimit": True})
+# Kraken public API — no keys required for OHLCV
+# (Binance is geo-restricted in some regions; Kraken works globally)
+_exchange = ccxt.kraken({"enableRateLimit": True})
 
 DEFAULT_SYMBOLS = ["BTC/USDT", "ETH/USDT", "XRP/USDT"]
 DEFAULT_TIMEFRAMES = ["1h", "4h", "1d"]
@@ -106,7 +107,7 @@ def backfill(
     db: Session,
     symbol: str,
     timeframe: str,
-    exchange: str = "binance",
+    exchange: str = "kraken",
     start_date: datetime | None = None,
 ) -> int:
     """Paginated historical backfill for a single symbol + timeframe.
@@ -156,7 +157,7 @@ def fetch_latest(
     db: Session,
     symbol: str,
     timeframe: str,
-    exchange: str = "binance",
+    exchange: str = "kraken",
     limit: int = 5,
 ) -> int:
     """Fetch the most recent candles and upsert (for hourly updates).

@@ -39,7 +39,7 @@ def seed_watched_symbols(db: Session) -> list[str]:
         if exists is None:
             ws = WatchedSymbols(
                 symbol=symbol,
-                exchange="binance",
+                exchange="kraken",
                 is_active=True,
                 timeframes=DEFAULT_TIMEFRAMES,
             )
