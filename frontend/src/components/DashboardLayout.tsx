@@ -10,6 +10,7 @@ import NumerologyCard from './cards/NumerologyCard';
 import SentimentCard from './cards/SentimentCard';
 import OnchainCard from './cards/OnchainCard';
 import PoliticalCard from './cards/PoliticalCard';
+import MacroCard from './cards/MacroCard';
 import AlertsCard from './cards/AlertsCard';
 import ChartCard from './cards/ChartCard';
 
@@ -39,6 +40,7 @@ export default function DashboardLayout() {
             {/* Right column (2/5 on desktop) */}
             <div className="lg:col-span-2 space-y-3 lg:space-y-4">
               <ConfluenceCard />
+              <MacroCard />
               <CelestialCard />
               <NumerologyCard />
               <PoliticalCard />

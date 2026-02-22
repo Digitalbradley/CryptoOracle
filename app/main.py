@@ -23,6 +23,7 @@ from app.routers import confluence
 from app.routers import alerts_router
 from app.routers import backtest
 from app.routers import political
+from app.routers import macro
 from app.routers import auth
 from app.services.auth_service import decode_access_token, ensure_admin_user
 from app.services.scheduler import start_scheduler, stop_scheduler
@@ -147,6 +148,7 @@ app.include_router(confluence.router)
 app.include_router(alerts_router.router)
 app.include_router(backtest.router)
 app.include_router(political.router)
+app.include_router(macro.router)
 
 
 @app.post("/api/bootstrap", tags=["admin"])
@@ -233,4 +235,22 @@ def bootstrap_phase4(db: Session = Depends(get_db)):
         return {"status": "complete", **result}
     except Exception as e:
         logger.exception("Phase 4 bootstrap failed")
+        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
+
+
+@app.post("/api/bootstrap/phase5", tags=["admin"])
+def bootstrap_phase5(db: Session = Depends(get_db)):
+    """Trigger Phase 5 bootstrap: Macro Liquidity (Layer 7).
+
+    Backfills FRED (1yr), forex (90d), CFTC COT (52wk), EIA (2yr),
+    seeds weight profile, adds macro calendar events, computes initial signal.
+    Requires FRED_API_KEY at minimum. Optional: TWELVE_DATA_API_KEY, EIA_API_KEY.
+    """
+    try:
+        from app.services.phase5_seed import run_phase5_bootstrap
+
+        result = run_phase5_bootstrap(db)
+        return {"status": "complete", **result}
+    except Exception as e:
+        logger.exception("Phase 5 bootstrap failed")
         return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}

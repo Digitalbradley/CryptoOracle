@@ -13,6 +13,7 @@ const LAYERS = [
   { key: 'numerology_score' as const, label: 'Numerology', color: 'var(--layer-numerology)', weightKey: 'numerology' as const },
   { key: 'sentiment_score' as const, label: 'Sentiment', color: 'var(--layer-sentiment)', weightKey: 'sentiment' as const },
   { key: 'political_score' as const, label: 'Political', color: 'var(--layer-political)', weightKey: 'political' as const },
+  { key: 'macro_score' as const, label: 'Macro', color: 'var(--layer-macro)', weightKey: 'macro' as const },
 ];
 
 export default function ConfluenceCard() {
@@ -25,7 +26,7 @@ export default function ConfluenceCard() {
         <div className="space-y-3">
           <Skeleton className="h-12 w-24 mx-auto" />
           <Skeleton className="h-2 w-full" />
-          {Array.from({ length: 6 }).map((_, i) => (
+          {Array.from({ length: 7 }).map((_, i) => (
             <Skeleton key={i} className="h-4 w-full" />
           ))}
         </div>

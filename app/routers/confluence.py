@@ -18,12 +18,13 @@ router = APIRouter(tags=["confluence"])
 
 
 class WeightUpdate(BaseModel):
-    ta: float = 0.25
-    onchain: float = 0.20
-    celestial: float = 0.15
-    numerology: float = 0.10
-    sentiment: float = 0.15
-    political: float = 0.15
+    ta: float = 0.20
+    onchain: float = 0.15
+    celestial: float = 0.12
+    numerology: float = 0.08
+    sentiment: float = 0.12
+    political: float = 0.13
+    macro: float = 0.20
 
 
 # ---- Static routes first (before {symbol} wildcard) ----
@@ -39,7 +40,8 @@ def get_weights(db: Session = Depends(get_db)):
 @router.post("/api/confluence/weights")
 def update_weights(body: WeightUpdate, db: Session = Depends(get_db)):
     """Update signal weights. Creates a new profile or updates existing."""
-    total = body.ta + body.onchain + body.celestial + body.numerology + body.sentiment + body.political
+    total = (body.ta + body.onchain + body.celestial + body.numerology
+             + body.sentiment + body.political + body.macro)
     if abs(total - 1.0) > 0.01:
         return {"error": f"Weights must sum to 1.0 (got {total:.4f})"}
 
@@ -59,6 +61,7 @@ def update_weights(body: WeightUpdate, db: Session = Depends(get_db)):
         numerology_weight=Decimal(str(body.numerology)),
         sentiment_weight=Decimal(str(body.sentiment)),
         political_weight=Decimal(str(body.political)),
+        macro_weight=Decimal(str(body.macro)),
         is_active=True,
     )
     db.add(profile)
@@ -73,6 +76,7 @@ def update_weights(body: WeightUpdate, db: Session = Depends(get_db)):
             "numerology": body.numerology,
             "sentiment": body.sentiment,
             "political": body.political,
+            "macro": body.macro,
         },
     }
 
@@ -103,6 +107,7 @@ def get_confluence(
             "numerology_score": result.get("numerology_score"),
             "sentiment_score": result.get("sentiment_score"),
             "political_score": result.get("political_score"),
+            "macro_score": result.get("macro_score"),
         },
         "composite_score": result["composite_score"],
         "signal_strength": result["signal_strength"],
@@ -152,6 +157,7 @@ def get_confluence_history(
                 "sentiment_score": str(r.sentiment_score) if r.sentiment_score else None,
                 "onchain_score": str(r.onchain_score) if r.onchain_score else None,
                 "political_score": str(r.political_score) if r.political_score else None,
+                "macro_score": str(r.macro_score) if r.macro_score else None,
             }
             for r in rows
         ],

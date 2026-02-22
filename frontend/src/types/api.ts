@@ -7,7 +7,8 @@ export type LayerName =
   | 'celestial'
   | 'numerology'
   | 'sentiment'
-  | 'political';
+  | 'political'
+  | 'macro';
 
 export type SignalStrength =
   | 'STRONG BUY'
@@ -151,6 +152,7 @@ export interface ConfluenceScores {
   numerology_score: number | null;
   sentiment_score: number | null;
   political_score: number | null;
+  macro_score: number | null;
 }
 
 export interface ConfluenceResponse {
@@ -214,5 +216,37 @@ export interface WeightsResponse {
     numerology: number;
     sentiment: number;
     political: number;
+    macro: number;
   };
+}
+
+// ---------- Macro Liquidity ----------
+export interface MacroSubSignals {
+  liquidity_score: string | null;
+  treasury_score: string | null;
+  dollar_score: string | null;
+  oil_score: string | null;
+  carry_trade_score: string | null;
+}
+
+export interface MacroDataPoints {
+  net_liquidity: string | null;
+  m2_yoy_pct: string | null;
+  yield_curve_2s10s: string | null;
+  dxy_value: string | null;
+  vix_value: string | null;
+  wti_price: string | null;
+  usdjpy_value: string | null;
+  carry_stress: string | null;
+}
+
+export interface MacroSignalResponse {
+  timestamp: string;
+  macro_score: string | null;
+  regime: string | null;
+  regime_confidence: string | null;
+  sub_signals: MacroSubSignals;
+  data_points: MacroDataPoints;
+  sub_signal_detail: Record<string, unknown> | null;
+  status?: string;
 }

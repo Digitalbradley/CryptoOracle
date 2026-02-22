@@ -21,6 +21,7 @@ class SignalWeights(Base):
     numerology_weight: Mapped[Decimal] = mapped_column(DECIMAL(5, 4), default=0.10)
     sentiment_weight: Mapped[Decimal] = mapped_column(DECIMAL(5, 4), default=0.15)
     political_weight: Mapped[Decimal] = mapped_column(DECIMAL(5, 4), default=0.15)
+    macro_weight: Mapped[Decimal] = mapped_column(DECIMAL(5, 4), default=0.00)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())

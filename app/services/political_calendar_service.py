@@ -54,6 +54,35 @@ GDP_2026_DATES = [
     date(2026, 7, 29), date(2026, 10, 28),
 ]
 
+# BOJ Monetary Policy Meetings (decision dates, 8x/year)
+BOJ_2026_DATES = [
+    date(2026, 1, 24), date(2026, 3, 14),
+    date(2026, 4, 30), date(2026, 6, 18),
+    date(2026, 7, 31), date(2026, 9, 17),
+    date(2026, 10, 30), date(2026, 12, 18),
+]
+
+# ECB Governing Council Rate Decisions (8x/year)
+ECB_2026_DATES = [
+    date(2026, 1, 30), date(2026, 3, 12),
+    date(2026, 4, 16), date(2026, 6, 4),
+    date(2026, 7, 16), date(2026, 9, 10),
+    date(2026, 10, 29), date(2026, 12, 10),
+]
+
+# OPEC+ Ministerial Meetings (approximate, ~6x/year)
+OPEC_2026_DATES = [
+    date(2026, 2, 1), date(2026, 4, 3),
+    date(2026, 6, 5), date(2026, 8, 7),
+    date(2026, 10, 2), date(2026, 12, 4),
+]
+
+# Treasury Quarterly Refunding Announcements (4x/year)
+TREASURY_REFUND_2026_DATES = [
+    date(2026, 2, 4), date(2026, 5, 6),
+    date(2026, 8, 5), date(2026, 11, 4),
+]
+
 
 def _build_seed_events(year: int = 2026) -> list[dict]:
     """Build list of seed events for the given year."""
@@ -135,6 +164,69 @@ def _build_seed_events(year: int = 2026) -> list[dict]:
         "is_recurring": True,
         "recurrence_rule": "2yr",
     })
+
+    # --- Macro-relevant events (Layer 7) ---
+
+    # BOJ rate decisions — carry trade key driver
+    for d in BOJ_2026_DATES:
+        events.append({
+            "event_date": d,
+            "event_type": "boj_meeting",
+            "category": "monetary_policy",
+            "title": f"BOJ Rate Decision ({d.strftime('%b %d')}, {year})",
+            "description": "Bank of Japan monetary policy meeting. Key carry trade driver.",
+            "country": "JP",
+            "expected_volatility": "high",
+            "crypto_relevance": 7,
+            "is_recurring": True,
+            "recurrence_rule": "8x/year",
+        })
+
+    # ECB rate decisions
+    for d in ECB_2026_DATES:
+        events.append({
+            "event_date": d,
+            "event_type": "ecb_meeting",
+            "category": "monetary_policy",
+            "title": f"ECB Rate Decision ({d.strftime('%b %d')}, {year})",
+            "description": "European Central Bank interest rate decision.",
+            "country": "EU",
+            "expected_volatility": "medium",
+            "crypto_relevance": 5,
+            "is_recurring": True,
+            "recurrence_rule": "8x/year",
+        })
+
+    # OPEC+ meetings — oil supply decisions
+    for d in OPEC_2026_DATES:
+        events.append({
+            "event_date": d,
+            "event_type": "opec_meeting",
+            "category": "geopolitical",
+            "title": f"OPEC+ Ministerial Meeting ({d.strftime('%b %d')}, {year})",
+            "description": "OPEC+ production decision. Affects oil prices and inflation.",
+            "country": "INTL",
+            "expected_volatility": "medium",
+            "crypto_relevance": 5,
+            "is_recurring": True,
+            "recurrence_rule": "6x/year",
+        })
+
+    # Treasury quarterly refunding
+    for d in TREASURY_REFUND_2026_DATES:
+        q_num = (d.month - 1) // 3 + 1
+        events.append({
+            "event_date": d,
+            "event_type": "treasury_refunding",
+            "category": "monetary_policy",
+            "title": f"Treasury Quarterly Refunding Q{q_num} ({year})",
+            "description": "US Treasury auction sizes announced. Affects bond market liquidity.",
+            "country": "US",
+            "expected_volatility": "medium",
+            "crypto_relevance": 4,
+            "is_recurring": True,
+            "recurrence_rule": "quarterly",
+        })
 
     return events
 

@@ -12,6 +12,14 @@ from sqlalchemy.orm import Session
 
 from app.models.alerts import Alerts
 from app.models.celestial_state import CelestialState
+from app.models.macro_liquidity import (
+    CarryTradeData,
+    LiquidityData,
+    MacroLiquiditySignal,
+    MacroPrices,
+    OilData,
+    RateData,
+)
 from app.models.political_calendar import PoliticalCalendar
 from app.models.political_news import PoliticalNews
 from app.models.political_signal import PoliticalSignal
@@ -319,6 +327,149 @@ class AlertEngine:
 
         return alerts
 
+    def check_macro_alerts(self, db: Session, symbol: str) -> list[dict]:
+        """Check for macro liquidity alerts per brief Section 7.3.
+
+        Triggers:
+        - Carry trade unwind: carry_stress > 0.7 + USD/JPY weakening >2% in 5d
+        - Oil shock: WTI moves >10% in 5 days
+        - Liquidity regime change: M2 YoY growth flips sign
+        - Dollar breakout: DXY crosses 108 (up) or 98 (down) — DTWEXBGS ~125/112
+        - Yield curve event: 2s10s crosses zero
+        """
+        alerts = []
+
+        # Latest macro signal
+        signal = db.execute(
+            select(MacroLiquiditySignal)
+            .order_by(MacroLiquiditySignal.timestamp.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+
+        if not signal:
+            return []
+
+        # --- Carry trade unwind ---
+        if signal.carry_stress and float(signal.carry_stress) > 0.7:
+            # Check USD/JPY 5-day weakening
+            latest_carry = db.execute(
+                select(CarryTradeData)
+                .where(CarryTradeData.usdjpy.isnot(None))
+                .order_by(CarryTradeData.timestamp.desc())
+                .limit(1)
+            ).scalar_one_or_none()
+            if latest_carry and latest_carry.usdjpy:
+                ts_5d = latest_carry.timestamp - timedelta(days=5)
+                prior = db.execute(
+                    select(CarryTradeData)
+                    .where(CarryTradeData.usdjpy.isnot(None),
+                           CarryTradeData.timestamp <= ts_5d)
+                    .order_by(CarryTradeData.timestamp.desc())
+                    .limit(1)
+                ).scalar_one_or_none()
+                if prior and prior.usdjpy:
+                    pct = (float(latest_carry.usdjpy) - float(prior.usdjpy)) / float(prior.usdjpy) * 100
+                    if pct < -2:
+                        alerts.append({
+                            "symbol": symbol,
+                            "alert_type": "carry_trade_unwind",
+                            "severity": "critical",
+                            "title": f"Carry trade unwind detected (stress: {float(signal.carry_stress):.2f})",
+                            "description": (
+                                f"Carry stress at {float(signal.carry_stress):.2f} and "
+                                f"USD/JPY weakened {pct:+.1f}% in 5 days."
+                            ),
+                            "trigger_data": {
+                                "carry_stress": float(signal.carry_stress),
+                                "usdjpy_5d_pct": round(pct, 2),
+                            },
+                        })
+
+        # --- Oil shock ---
+        latest_oil = db.execute(
+            select(OilData)
+            .where(OilData.wti_price.isnot(None))
+            .order_by(OilData.timestamp.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        if latest_oil and latest_oil.wti_price:
+            ts_5d = latest_oil.timestamp - timedelta(days=5)
+            prior_oil = db.execute(
+                select(OilData)
+                .where(OilData.wti_price.isnot(None), OilData.timestamp <= ts_5d)
+                .order_by(OilData.timestamp.desc())
+                .limit(1)
+            ).scalar_one_or_none()
+            if prior_oil and prior_oil.wti_price:
+                pct = (float(latest_oil.wti_price) - float(prior_oil.wti_price)) / float(prior_oil.wti_price) * 100
+                if abs(pct) > 10:
+                    direction = "spike" if pct > 0 else "crash"
+                    alerts.append({
+                        "symbol": symbol,
+                        "alert_type": "oil_shock",
+                        "severity": "warning",
+                        "title": f"Oil {direction}: WTI {pct:+.1f}% in 5 days",
+                        "description": (
+                            f"WTI crude moved {pct:+.1f}% in 5 days "
+                            f"(${float(prior_oil.wti_price):.2f} → ${float(latest_oil.wti_price):.2f})."
+                        ),
+                        "trigger_data": {
+                            "wti_current": float(latest_oil.wti_price),
+                            "wti_5d_pct": round(pct, 2),
+                        },
+                    })
+
+        # --- Dollar breakout (DTWEXBGS scale) ---
+        if signal.dxy_value:
+            dxy = float(signal.dxy_value)
+            if dxy > 125:
+                alerts.append({
+                    "symbol": symbol,
+                    "alert_type": "dollar_breakout",
+                    "severity": "warning",
+                    "title": f"Dollar strength breakout: DXY at {dxy:.1f}",
+                    "description": "Dollar index above 125 — strong headwind for crypto.",
+                    "trigger_data": {"dxy": dxy},
+                })
+            elif dxy < 112:
+                alerts.append({
+                    "symbol": symbol,
+                    "alert_type": "dollar_breakout",
+                    "severity": "info",
+                    "title": f"Dollar weakness: DXY at {dxy:.1f}",
+                    "description": "Dollar index below 112 — favorable for crypto.",
+                    "trigger_data": {"dxy": dxy},
+                })
+
+        # --- Yield curve event ---
+        if signal.yield_curve_2s10s is not None:
+            curve = float(signal.yield_curve_2s10s)
+            # Check previous signal for zero-crossing
+            prior_signal = db.execute(
+                select(MacroLiquiditySignal)
+                .where(MacroLiquiditySignal.yield_curve_2s10s.isnot(None))
+                .order_by(MacroLiquiditySignal.timestamp.desc())
+                .offset(1)
+                .limit(1)
+            ).scalar_one_or_none()
+            if prior_signal and prior_signal.yield_curve_2s10s is not None:
+                prev_curve = float(prior_signal.yield_curve_2s10s)
+                if (curve >= 0 and prev_curve < 0) or (curve < 0 and prev_curve >= 0):
+                    event = "un-inversion" if curve >= 0 else "inversion"
+                    alerts.append({
+                        "symbol": symbol,
+                        "alert_type": "yield_curve_event",
+                        "severity": "warning",
+                        "title": f"Yield curve {event}: 2s10s at {curve:+.2f}%",
+                        "description": (
+                            f"Yield curve crossed zero ({prev_curve:+.2f}% → {curve:+.2f}%). "
+                            f"{'Recession signal receding.' if event == 'un-inversion' else 'Recession signal flashing.'}"
+                        ),
+                        "trigger_data": {"yield_curve_2s10s": curve, "previous": prev_curve},
+                    })
+
+        return alerts
+
     def create_alert(self, db: Session, alert_data: dict) -> bool:
         """Insert an alert into the alerts table.
 
@@ -380,6 +531,7 @@ class AlertEngine:
         all_alerts.extend(self.check_celestial_alerts(db, today))
         all_alerts.extend(self.check_sentiment_alerts(db, symbol))
         all_alerts.extend(self.check_political_alerts(db, symbol))
+        all_alerts.extend(self.check_macro_alerts(db, symbol))
 
         for alert_data in all_alerts:
             if self.create_alert(db, alert_data):

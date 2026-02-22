@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     # Claude API
     anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
 
+    # Macro Liquidity (Layer 7)
+    fred_api_key: str = Field(default="", alias="FRED_API_KEY")
+    twelve_data_api_key: str = Field(default="", alias="TWELVE_DATA_API_KEY")
+    eia_api_key: str = Field(default="", alias="EIA_API_KEY")
+
     # Notifications
     alert_email: str = Field(default="", alias="ALERT_EMAIL")
 

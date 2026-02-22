@@ -1,8 +1,8 @@
-"""Confluence scoring engine — weighted composite of all signal layers.
+"""Confluence scoring engine — weighted composite of all 7 signal layers.
 
 Gathers latest scores from TA, celestial, numerology, sentiment, on-chain,
-and political layers. Computes a weighted composite score, determines signal
-strength, and detects layer alignment.
+political, and macro liquidity layers. Computes a weighted composite score,
+determines signal strength, and detects layer alignment.
 
 Missing layers (None scores) are handled gracefully — their weight is
 redistributed proportionally across available layers.
@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.models.celestial_state import CelestialState
 from app.models.confluence_scores import ConfluenceScores
+from app.models.macro_liquidity import MacroLiquiditySignal
 from app.models.numerology_daily import NumerologyDaily
 from app.models.onchain_metrics import OnchainMetrics
 from app.models.political_signal import PoliticalSignal
@@ -27,14 +28,15 @@ from app.models.ta_indicators import TAIndicators
 
 logger = logging.getLogger(__name__)
 
-# Default weights (must sum to 1.0)
+# Default weights (must sum to 1.0) — brief Section 7.1
 DEFAULT_WEIGHTS = {
-    "ta": 0.25,
-    "onchain": 0.20,
-    "celestial": 0.15,
-    "numerology": 0.10,
-    "sentiment": 0.15,
-    "political": 0.15,
+    "ta": 0.20,
+    "onchain": 0.15,
+    "celestial": 0.12,
+    "numerology": 0.08,
+    "sentiment": 0.12,
+    "political": 0.13,
+    "macro": 0.20,
 }
 
 # Signal strength thresholds
@@ -69,6 +71,7 @@ class ConfluenceEngine:
             "numerology": float(row.numerology_weight),
             "sentiment": float(row.sentiment_weight),
             "political": float(row.political_weight),
+            "macro": float(row.macro_weight),
         }
 
     def gather_latest_scores(
@@ -146,6 +149,16 @@ class ConfluenceEngine:
             float(pol_row.political_score) if pol_row and pol_row.political_score else None
         )
 
+        # Macro liquidity: latest (not symbol-specific)
+        macro_row = db.execute(
+            select(MacroLiquiditySignal)
+            .order_by(MacroLiquiditySignal.timestamp.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        scores["macro_score"] = (
+            float(macro_row.macro_score) if macro_row and macro_row.macro_score else None
+        )
+
         return scores
 
     def compute_composite(self, scores: dict, weights: dict) -> dict:
@@ -168,6 +181,7 @@ class ConfluenceEngine:
             "numerology_score": "numerology",
             "sentiment_score": "sentiment",
             "political_score": "political",
+            "macro_score": "macro",
         }
 
         # Filter to available (non-None) layers
@@ -226,6 +240,7 @@ class ConfluenceEngine:
             "numerology_score": scores.get("numerology_score"),
             "sentiment_score": scores.get("sentiment_score"),
             "political_score": scores.get("political_score"),
+            "macro_score": scores.get("macro_score"),
             "weights": weights,
             "composite_score": composite,
             "signal_strength": signal_strength,
@@ -268,6 +283,7 @@ class ConfluenceEngine:
             "numerology_score": _to_decimal(result["numerology_score"]),
             "sentiment_score": _to_decimal(result["sentiment_score"]),
             "political_score": _to_decimal(result["political_score"]),
+            "macro_score": _to_decimal(result["macro_score"]),
             "weights": result["weights"],
             "composite_score": Decimal(str(result["composite_score"])),
             "signal_strength": result["signal_strength"],
@@ -285,6 +301,7 @@ class ConfluenceEngine:
                 "numerology_score": stmt.excluded.numerology_score,
                 "sentiment_score": stmt.excluded.sentiment_score,
                 "political_score": stmt.excluded.political_score,
+                "macro_score": stmt.excluded.macro_score,
                 "weights": stmt.excluded.weights,
                 "composite_score": stmt.excluded.composite_score,
                 "signal_strength": stmt.excluded.signal_strength,

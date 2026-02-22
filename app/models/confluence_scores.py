@@ -23,6 +23,7 @@ class ConfluenceScores(Base):
     numerology_score: Mapped[Decimal | None] = mapped_column(DECIMAL(5, 4))
     sentiment_score: Mapped[Decimal | None] = mapped_column(DECIMAL(5, 4))
     political_score: Mapped[Decimal | None] = mapped_column(DECIMAL(5, 4))
+    macro_score: Mapped[Decimal | None] = mapped_column(DECIMAL(5, 4))
 
     weights: Mapped[dict] = mapped_column(JSON, nullable=False)
 

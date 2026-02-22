@@ -169,6 +169,64 @@ def run_daily_esoteric() -> None:
         db.close()
 
 
+def run_macro_update() -> None:
+    """Fetch macro data (FRED, forex, CFTC, EIA) and recompute macro signal.
+
+    Runs every 4 hours in its own DB session.
+    Per brief Section 8.2: forex/oil 1-4h, yields daily, M2 weekly, CFTC weekly.
+    """
+    logger.info("Macro liquidity update starting...")
+    db = SessionLocal()
+
+    try:
+        # FRED: rates, DXY, VIX, oil, liquidity (latest 14 days)
+        try:
+            from app.services.fred_fetch import fetch_latest as fred_latest, is_available as fred_ok
+            if fred_ok():
+                result = fred_latest(db)
+                logger.info("FRED update: %s", result)
+        except Exception:
+            logger.exception("Error in FRED fetch")
+
+        # Forex: USD/JPY, EUR/USD
+        try:
+            from app.services.forex_fetch import fetch_latest as forex_latest, is_available as forex_ok
+            if forex_ok():
+                result = forex_latest(db)
+                logger.info("Forex update: %s", result)
+        except Exception:
+            logger.exception("Error in forex fetch")
+
+        # CFTC COT: weekly JPY positioning
+        try:
+            from app.services.cftc_fetch import fetch_latest as cftc_latest
+            result = cftc_latest(db)
+            logger.info("CFTC update: %s", result)
+        except Exception:
+            logger.exception("Error in CFTC fetch")
+
+        # EIA: weekly oil inventory
+        try:
+            from app.services.eia_fetch import fetch_latest as eia_latest, is_available as eia_ok
+            if eia_ok():
+                result = eia_latest(db)
+                logger.info("EIA update: %s", result)
+        except Exception:
+            logger.exception("Error in EIA fetch")
+
+        # Compute macro signal
+        try:
+            from app.services.macro_signal_service import compute_macro_signal
+            result = compute_macro_signal(db)
+            logger.info("Macro signal: score=%.4f regime=%s", result["macro_score"], result["regime"])
+        except Exception:
+            logger.exception("Error computing macro signal")
+
+        logger.info("Macro liquidity update complete.")
+    finally:
+        db.close()
+
+
 def start_scheduler() -> None:
     """Start the background scheduler with all jobs."""
     global _scheduler
@@ -205,6 +263,15 @@ def start_scheduler() -> None:
         name="4-hourly sentiment + on-chain fetch",
     )
 
+    # Every 4 hours: macro liquidity data + signal
+    _scheduler.add_job(
+        run_macro_update,
+        "interval",
+        hours=4,
+        id="macro_update",
+        name="4-hourly macro data fetch + signal compute",
+    )
+
     # Daily at 00:05 UTC: celestial + numerology
     _scheduler.add_job(
         run_daily_esoteric,
@@ -216,7 +283,7 @@ def start_scheduler() -> None:
     )
 
     _scheduler.start()
-    logger.info("Scheduler started — hourly + 30-min + 4-hourly + daily jobs enabled")
+    logger.info("Scheduler started — hourly + 30-min + 4-hourly + macro + daily jobs enabled")
 
 
 def stop_scheduler() -> None:
