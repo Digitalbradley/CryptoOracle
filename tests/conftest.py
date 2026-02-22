@@ -24,7 +24,23 @@ def mock_db():
 
 @pytest.fixture()
 def client(mock_db):
-    """TestClient with the DB dependency overridden to use mock_db."""
+    """TestClient with DB override and a valid auth cookie.
+
+    All existing tests use this fixture and expect authenticated access.
+    """
+    from app.services.auth_service import create_access_token
+
+    app.dependency_overrides[get_db] = lambda: mock_db
+    c = TestClient(app)
+    token = create_access_token("testadmin")
+    c.cookies.set("access_token", token)
+    yield c
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture()
+def anon_client(mock_db):
+    """TestClient with DB override but NO auth cookie (unauthenticated)."""
     app.dependency_overrides[get_db] = lambda: mock_db
     yield TestClient(app)
     app.dependency_overrides.clear()

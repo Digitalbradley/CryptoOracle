@@ -15,6 +15,7 @@ from app.models.price_data import PriceData
 from app.models.sentiment_data import SentimentData
 from app.models.signal_weights import SignalWeights
 from app.models.ta_indicators import TAIndicators
+from app.models.user import User
 from app.models.watched_symbols import WatchedSymbols
 
 __all__ = [
@@ -33,5 +34,6 @@ __all__ = [
     "SentimentData",
     "SignalWeights",
     "TAIndicators",
+    "User",
     "WatchedSymbols",
 ]

@@ -5,10 +5,13 @@ import traceback
 from contextlib import asynccontextmanager
 
 from fastapi import BackgroundTasks, Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 
 from app.config import settings
-from app.database import get_db
+from app.database import SessionLocal, get_db
 from app.routers import health
 from app.routers import price
 from app.routers import signals
@@ -20,9 +23,70 @@ from app.routers import confluence
 from app.routers import alerts_router
 from app.routers import backtest
 from app.routers import political
+from app.routers import auth
+from app.services.auth_service import decode_access_token, ensure_admin_user
 from app.services.scheduler import start_scheduler, stop_scheduler
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Paths that do not require authentication
+# ---------------------------------------------------------------------------
+PUBLIC_PATHS = {
+    "/health",
+    "/api/auth/login",
+    "/api/auth/logout",
+    "/api/auth/me",
+    "/docs",
+    "/openapi.json",
+    "/redoc",
+}
+
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    """Global JWT authentication middleware.
+
+    Reads the ``access_token`` httpOnly cookie.  Protected paths return 401
+    if the cookie is missing or the token is invalid/expired.  Public paths
+    are always allowed through, but the token is still decoded when present
+    so ``request.state.user`` is available on public endpoints like ``/api/auth/me``.
+    """
+
+    async def dispatch(self, request, call_next):
+        # Always allow CORS preflight
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
+        path = request.url.path
+        token = request.cookies.get("access_token")
+
+        # Attempt to decode the token (used for both public and protected paths)
+        username = None
+        if token:
+            username = decode_access_token(token)
+
+        if username:
+            request.state.user = username
+
+        # Public paths — allow through regardless of auth state
+        if path in PUBLIC_PATHS:
+            return await call_next(request)
+
+        # Protected paths — require valid token
+        if not token:
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Not authenticated"},
+            )
+
+        if not username:
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Invalid or expired token"},
+            )
+
+        return await call_next(request)
 
 
 @asynccontextmanager
@@ -33,13 +97,21 @@ async def lifespan(app: FastAPI):
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
     logger.info("CryptoOracle starting up (env=%s)", settings.app_env)
+
+    # Seed admin user from env vars if no users exist
+    db = SessionLocal()
+    try:
+        ensure_admin_user(db)
+    finally:
+        db.close()
+
     start_scheduler()
     yield
     stop_scheduler()
     logger.info("CryptoOracle shutting down")
 
 
-BUILD_TIMESTAMP = "2026-02-21T20:00:00Z"
+BUILD_TIMESTAMP = "2026-02-22T20:00:00Z"
 
 app = FastAPI(
     title="CryptoOracle",
@@ -48,7 +120,23 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# ---------------------------------------------------------------------------
+# Middleware (Starlette applies in reverse order — CORS must wrap auth)
+# ---------------------------------------------------------------------------
+app.add_middleware(AuthMiddleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[settings.frontend_url],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ---------------------------------------------------------------------------
+# Routers
+# ---------------------------------------------------------------------------
 app.include_router(health.router)
+app.include_router(auth.router)
 app.include_router(price.router)
 app.include_router(signals.router)
 app.include_router(celestial.router)

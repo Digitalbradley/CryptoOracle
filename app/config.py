@@ -48,6 +48,17 @@ class Settings(BaseSettings):
     app_env: str = Field(default="development", alias="APP_ENV")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
+    # Authentication
+    jwt_secret_key: str = Field(
+        default="CHANGE-ME-IN-PRODUCTION-USE-OPENSSL-RAND-HEX-32",
+        alias="JWT_SECRET_KEY",
+    )
+    jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
+    jwt_expiry_hours: int = Field(default=24, alias="JWT_EXPIRY_HOURS")
+    admin_username: str = Field(default="admin", alias="ADMIN_USERNAME")
+    admin_password: str = Field(default="", alias="ADMIN_PASSWORD")
+    frontend_url: str = Field(default="http://localhost:5173", alias="FRONTEND_URL")
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
