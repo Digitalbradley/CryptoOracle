@@ -1,6 +1,7 @@
 """APScheduler-based scheduled update service.
 
-Hourly: Fetches latest candles and recomputes TA indicators.
+Hourly: Fetches latest candles, recomputes TA indicators, computes confluence scores.
+Every 4 hours: Fetches sentiment (Fear & Greed) and on-chain metrics.
 Daily: Computes celestial state and numerology for the current date.
 """
 
@@ -23,7 +24,7 @@ _scheduler: BackgroundScheduler | None = None
 
 
 def run_hourly_update() -> None:
-    """Fetch latest candles and recompute TA for all active symbols.
+    """Fetch latest candles, recompute TA, then compute confluence + alerts.
 
     Runs in its own DB session (separate from FastAPI request cycle).
     """
@@ -49,7 +50,68 @@ def run_hourly_update() -> None:
                 except Exception:
                     logger.exception("Error updating %s %s", ws.symbol, tf)
 
+        # Compute confluence scores and run alert checks
+        try:
+            from app.services.alert_engine import AlertEngine
+            from app.services.confluence_engine import ConfluenceEngine
+
+            confluence = ConfluenceEngine()
+            alert_engine = AlertEngine()
+
+            for ws in symbols:
+                timeframes = ws.timeframes if isinstance(ws.timeframes, list) else DEFAULT_TIMEFRAMES
+                for tf in timeframes:
+                    try:
+                        result = confluence.compute_and_store(db, ws.symbol, tf)
+                        alert_engine.run_all_checks(db, ws.symbol, tf, result)
+                    except Exception:
+                        logger.exception("Error computing confluence for %s %s", ws.symbol, tf)
+        except Exception:
+            logger.exception("Error in confluence/alert computation")
+
         logger.info("Hourly update complete.")
+    finally:
+        db.close()
+
+
+def run_sentiment_onchain_update() -> None:
+    """Fetch sentiment (Fear & Greed) and on-chain metrics.
+
+    Runs every 4 hours in its own DB session.
+    """
+    logger.info("Sentiment + on-chain update starting...")
+    db = SessionLocal()
+
+    try:
+        symbols = db.execute(
+            select(WatchedSymbols).where(WatchedSymbols.is_active.is_(True))
+        ).scalars().all()
+
+        symbol_list = [ws.symbol for ws in symbols]
+
+        # Sentiment: Fear & Greed (market-wide, stored per symbol)
+        try:
+            from app.services.sentiment_fetch import fetch_and_store_current
+            count = fetch_and_store_current(db, symbol_list)
+            logger.info("Sentiment updated: %d rows", count)
+        except Exception:
+            logger.exception("Error fetching sentiment data")
+
+        # On-chain: CryptoQuant + Glassnode (if keys configured)
+        try:
+            from app.services.onchain_fetch import fetch_and_store, is_available
+            if is_available():
+                for symbol in symbol_list:
+                    try:
+                        fetch_and_store(db, symbol)
+                    except Exception:
+                        logger.exception("Error fetching on-chain for %s", symbol)
+            else:
+                logger.debug("No on-chain API keys configured — skipping")
+        except Exception:
+            logger.exception("Error in on-chain update")
+
+        logger.info("Sentiment + on-chain update complete.")
     finally:
         db.close()
 
@@ -82,7 +144,7 @@ def run_daily_esoteric() -> None:
 
 
 def start_scheduler() -> None:
-    """Start the background scheduler with hourly + daily jobs."""
+    """Start the background scheduler with all jobs."""
     global _scheduler
     if _scheduler is not None:
         logger.warning("Scheduler already running")
@@ -90,13 +152,22 @@ def start_scheduler() -> None:
 
     _scheduler = BackgroundScheduler()
 
-    # Hourly: fetch candles + recompute TA
+    # Hourly: fetch candles + recompute TA + confluence + alerts
     _scheduler.add_job(
         run_hourly_update,
         "interval",
         hours=1,
         id="hourly_update",
-        name="Hourly candle fetch + TA compute",
+        name="Hourly candle fetch + TA + confluence + alerts",
+    )
+
+    # Every 4 hours: sentiment + on-chain
+    _scheduler.add_job(
+        run_sentiment_onchain_update,
+        "interval",
+        hours=4,
+        id="sentiment_onchain_update",
+        name="4-hourly sentiment + on-chain fetch",
     )
 
     # Daily at 00:05 UTC: celestial + numerology
@@ -110,7 +181,7 @@ def start_scheduler() -> None:
     )
 
     _scheduler.start()
-    logger.info("Scheduler started — hourly + daily jobs enabled")
+    logger.info("Scheduler started — hourly + 4-hourly + daily jobs enabled")
 
 
 def stop_scheduler() -> None:

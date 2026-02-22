@@ -25,6 +25,7 @@ class Settings(BaseSettings):
 
     # On-chain
     cryptoquant_api_key: str = Field(default="", alias="CRYPTOQUANT_API_KEY")
+    glassnode_api_key: str = Field(default="", alias="GLASSNODE_API_KEY")
 
     # Sentiment
     alternative_me_api: str = Field(

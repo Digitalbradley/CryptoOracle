@@ -20,6 +20,9 @@ pandas>=2.1
 # pandas-ta>=0.3  # Defer: compatibility issues with pandas 2.x + numpy 2.x. Will use ta-lib or manual TA.
 numpy>=1.25
 
+# Statistics / Backtesting
+scipy>=1.11
+
 # Astronomy / Ephemeris
 ephem>=4.1
 # pyswisseph>=2.10  # Uncomment after installing C compiler or use conda

@@ -13,6 +13,11 @@ from app.routers import price
 from app.routers import signals
 from app.routers import celestial
 from app.routers import numerology
+from app.routers import sentiment
+from app.routers import onchain
+from app.routers import confluence
+from app.routers import alerts_router
+from app.routers import backtest
 from app.services.scheduler import start_scheduler, stop_scheduler
 
 logger = logging.getLogger(__name__)
@@ -46,6 +51,11 @@ app.include_router(price.router)
 app.include_router(signals.router)
 app.include_router(celestial.router)
 app.include_router(numerology.router)
+app.include_router(sentiment.router)
+app.include_router(onchain.router)
+app.include_router(confluence.router)
+app.include_router(alerts_router.router)
+app.include_router(backtest.router)
 
 
 @app.post("/api/bootstrap", tags=["admin"])
@@ -77,4 +87,17 @@ def bootstrap_phase2(db: Session = Depends(get_db)):
     from app.services.phase2_seed import run_phase2_bootstrap
 
     result = run_phase2_bootstrap(db)
+    return {"status": "complete", **result}
+
+
+@app.post("/api/bootstrap/phase3", tags=["admin"])
+def bootstrap_phase3(db: Session = Depends(get_db)):
+    """Trigger Phase 3 bootstrap: seed weights, backfill sentiment, compute confluence, run backtest.
+
+    This can take several minutes depending on data volume.
+    Monitor progress via server logs.
+    """
+    from app.services.phase3_seed import run_phase3_bootstrap
+
+    result = run_phase3_bootstrap(db)
     return {"status": "complete", **result}
