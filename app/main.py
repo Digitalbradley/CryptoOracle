@@ -97,7 +97,12 @@ def bootstrap_phase3(db: Session = Depends(get_db)):
     This can take several minutes depending on data volume.
     Monitor progress via server logs.
     """
-    from app.services.phase3_seed import run_phase3_bootstrap
+    import traceback
+    try:
+        from app.services.phase3_seed import run_phase3_bootstrap
 
-    result = run_phase3_bootstrap(db)
-    return {"status": "complete", **result}
+        result = run_phase3_bootstrap(db)
+        return {"status": "complete", **result}
+    except Exception as e:
+        logger.exception("Phase 3 bootstrap failed")
+        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
