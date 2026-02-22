@@ -19,6 +19,7 @@ from app.routers import onchain
 from app.routers import confluence
 from app.routers import alerts_router
 from app.routers import backtest
+from app.routers import political
 from app.services.scheduler import start_scheduler, stop_scheduler
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,7 @@ app.include_router(onchain.router)
 app.include_router(confluence.router)
 app.include_router(alerts_router.router)
 app.include_router(backtest.router)
+app.include_router(political.router)
 
 
 @app.post("/api/bootstrap", tags=["admin"])
@@ -125,4 +127,22 @@ def bootstrap_phase3(db: Session = Depends(get_db)):
         return {"status": "complete", **result}
     except Exception as e:
         logger.exception("Phase 3 bootstrap failed")
+        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
+
+
+@app.post("/api/bootstrap/phase4", tags=["admin"])
+def bootstrap_phase4(db: Session = Depends(get_db)):
+    """Trigger Phase 4 bootstrap: seed political calendar, fetch initial news, compute signal.
+
+    Requires no API keys for basic operation (RSS feeds).
+    NewsAPI/GNews/Claude classification require respective API keys.
+    Monitor progress via server logs.
+    """
+    try:
+        from app.services.phase4_seed import run_phase4_bootstrap
+
+        result = run_phase4_bootstrap(db)
+        return {"status": "complete", **result}
+    except Exception as e:
+        logger.exception("Phase 4 bootstrap failed")
         return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}

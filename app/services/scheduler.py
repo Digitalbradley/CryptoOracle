@@ -1,6 +1,7 @@
 """APScheduler-based scheduled update service.
 
-Hourly: Fetches latest candles, recomputes TA indicators, computes confluence scores.
+Hourly: Fetches latest candles, recomputes TA indicators, political signal, confluence scores.
+Every 30 minutes: Fetches political news from all available sources.
 Every 4 hours: Fetches sentiment (Fear & Greed) and on-chain metrics.
 Daily: Computes celestial state and numerology for the current date.
 """
@@ -49,6 +50,13 @@ def run_hourly_update() -> None:
                     analyzer.compute_indicators(ws.symbol, tf, db)
                 except Exception:
                     logger.exception("Error updating %s %s", ws.symbol, tf)
+
+        # Compute political signal (before confluence so it picks up the latest score)
+        try:
+            from app.services.political_signal_service import compute_and_store as compute_political
+            compute_political(db)
+        except Exception:
+            logger.exception("Error computing political signal")
 
         # Compute confluence scores and run alert checks
         try:
@@ -116,6 +124,24 @@ def run_sentiment_onchain_update() -> None:
         db.close()
 
 
+def run_political_news_update() -> None:
+    """Fetch political news from all available sources.
+
+    Runs every 30 minutes in its own DB session.
+    """
+    logger.info("Political news update starting...")
+    db = SessionLocal()
+
+    try:
+        from app.services.political_news_service import fetch_and_store
+        count = fetch_and_store(db)
+        logger.info("Political news update complete: %d articles", count)
+    except Exception:
+        logger.exception("Error in political news update")
+    finally:
+        db.close()
+
+
 def run_daily_esoteric() -> None:
     """Compute daily celestial state and numerology.
 
@@ -161,6 +187,15 @@ def start_scheduler() -> None:
         name="Hourly candle fetch + TA + confluence + alerts",
     )
 
+    # Every 30 minutes: political news fetch
+    _scheduler.add_job(
+        run_political_news_update,
+        "interval",
+        minutes=30,
+        id="political_news_update",
+        name="30-min political news fetch",
+    )
+
     # Every 4 hours: sentiment + on-chain
     _scheduler.add_job(
         run_sentiment_onchain_update,
@@ -181,7 +216,7 @@ def start_scheduler() -> None:
     )
 
     _scheduler.start()
-    logger.info("Scheduler started — hourly + 4-hourly + daily jobs enabled")
+    logger.info("Scheduler started — hourly + 30-min + 4-hourly + daily jobs enabled")
 
 
 def stop_scheduler() -> None:

@@ -268,6 +268,85 @@ def make_signal_weights_row(**overrides):
     return row
 
 
+def make_political_calendar_row(**overrides):
+    row = MagicMock()
+    defaults = {
+        "id": 1,
+        "event_date": date(2026, 3, 18),
+        "event_time": None,
+        "event_type": "fomc_meeting",
+        "category": "monetary_policy",
+        "title": "FOMC Meeting (Mar 17-18, 2026)",
+        "description": "Federal Open Market Committee interest rate decision.",
+        "country": "US",
+        "expected_volatility": "high",
+        "expected_direction": None,
+        "crypto_relevance": 8,
+        "actual_outcome": None,
+        "actual_price_impact_pct": None,
+        "date_gematria_value": 20,
+        "key_figure_gematria": None,
+        "event_title_gematria": {"english_ordinal": 315},
+        "source_url": None,
+        "source_name": None,
+        "is_recurring": True,
+        "recurrence_rule": "8x/year",
+    }
+    defaults.update(overrides)
+    for k, v in defaults.items():
+        setattr(row, k, v)
+    return row
+
+
+def make_political_news_row(**overrides):
+    row = MagicMock()
+    defaults = {
+        "id": 1,
+        "timestamp": datetime(2026, 1, 15, 14, 30, tzinfo=timezone.utc),
+        "source_name": "CoinDesk",
+        "headline": "SEC Approves New Crypto Regulation Framework",
+        "source_url": "https://coindesk.com/article/123",
+        "summary": "The SEC has approved a new framework for crypto regulation.",
+        "category": "crypto_regulation",
+        "subcategory": "sec",
+        "crypto_relevance_score": Decimal("0.8500"),
+        "sentiment_score": Decimal("0.3200"),
+        "urgency_score": Decimal("0.5000"),
+        "entities": ["SEC", "crypto"],
+        "headline_gematria": {"english_ordinal": 450},
+    }
+    defaults.update(overrides)
+    for k, v in defaults.items():
+        setattr(row, k, v)
+    return row
+
+
+def make_political_signal_row(**overrides):
+    row = MagicMock()
+    defaults = {
+        "id": 1,
+        "timestamp": datetime(2026, 1, 15, 12, 0, tzinfo=timezone.utc),
+        "hours_to_next_major_event": 72,
+        "next_event_type": "fomc_meeting",
+        "next_event_expected_volatility": "high",
+        "upcoming_events_7d": 2,
+        "upcoming_high_impact_7d": 1,
+        "news_volume_1h": 3,
+        "news_volume_24h": 15,
+        "avg_news_sentiment_1h": Decimal("0.1500"),
+        "avg_news_sentiment_24h": Decimal("-0.0500"),
+        "max_urgency_1h": Decimal("0.4000"),
+        "dominant_narrative": "crypto_regulation/sec",
+        "narrative_strength": Decimal("2.5000"),
+        "narrative_direction": "bullish",
+        "political_score": Decimal("0.2345"),
+    }
+    defaults.update(overrides)
+    for k, v in defaults.items():
+        setattr(row, k, v)
+    return row
+
+
 # ---------------------------------------------------------------------------
 # Helper to wire mock_db to return rows from scalars().all() or
 # scalar_one_or_none() chains

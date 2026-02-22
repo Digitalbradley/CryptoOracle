@@ -12,6 +12,9 @@ from sqlalchemy.orm import Session
 
 from app.models.alerts import Alerts
 from app.models.celestial_state import CelestialState
+from app.models.political_calendar import PoliticalCalendar
+from app.models.political_news import PoliticalNews
+from app.models.political_signal import PoliticalSignal
 from app.models.sentiment_data import SentimentData
 from app.services import cycle_tracker
 
@@ -225,6 +228,97 @@ class AlertEngine:
 
         return alerts
 
+    def check_political_alerts(self, db: Session, symbol: str) -> list[dict]:
+        """Check for political event alerts.
+
+        Triggers:
+        - FOMC/CPI within 24h → "political_event" alert
+        - News volume spike (>10 articles in 1h) → "political_news_spike" alert
+        - Extreme political_score (±0.7) → "extreme_political" alert
+        """
+        alerts = []
+        today = date.today()
+        tomorrow = today + timedelta(days=1)
+
+        # Check for major events within 24h
+        upcoming = db.execute(
+            select(PoliticalCalendar).where(
+                PoliticalCalendar.event_date >= today,
+                PoliticalCalendar.event_date <= tomorrow,
+                PoliticalCalendar.expected_volatility.in_(["high", "extreme"]),
+            )
+        ).scalars().all()
+
+        for event in upcoming:
+            alerts.append({
+                "symbol": symbol,
+                "alert_type": "political_event",
+                "severity": "warning",
+                "title": f"Political event within 24h: {event.title}",
+                "description": (
+                    f"{event.event_type} on {event.event_date.isoformat()}. "
+                    f"Expected volatility: {event.expected_volatility}."
+                ),
+                "trigger_data": {
+                    "event_type": event.event_type,
+                    "event_date": event.event_date.isoformat(),
+                    "volatility": event.expected_volatility,
+                },
+            })
+
+        # Check for news volume spike (>10 articles in 1h)
+        cutoff_1h = datetime.now(timezone.utc) - timedelta(hours=1)
+        news_1h = db.execute(
+            select(PoliticalNews).where(PoliticalNews.timestamp >= cutoff_1h)
+        ).scalars().all()
+
+        if len(news_1h) > 10:
+            alerts.append({
+                "symbol": symbol,
+                "alert_type": "political_news_spike",
+                "severity": "warning",
+                "title": f"Political news spike: {len(news_1h)} articles in 1h",
+                "description": (
+                    f"Unusual volume of {len(news_1h)} political news articles "
+                    f"in the last hour."
+                ),
+                "trigger_data": {"news_count_1h": len(news_1h)},
+            })
+
+        # Check for extreme political score
+        latest_signal = db.execute(
+            select(PoliticalSignal)
+            .order_by(PoliticalSignal.timestamp.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+
+        if latest_signal and latest_signal.political_score is not None:
+            pol_score = float(latest_signal.political_score)
+            if pol_score >= 0.7:
+                alerts.append({
+                    "symbol": symbol,
+                    "alert_type": "extreme_political",
+                    "severity": "warning",
+                    "title": f"Strong political bullish signal: {pol_score:+.4f}",
+                    "description": (
+                        f"Political score {pol_score:+.4f} exceeds +0.7 threshold."
+                    ),
+                    "trigger_data": {"political_score": pol_score},
+                })
+            elif pol_score <= -0.7:
+                alerts.append({
+                    "symbol": symbol,
+                    "alert_type": "extreme_political",
+                    "severity": "warning",
+                    "title": f"Strong political bearish signal: {pol_score:+.4f}",
+                    "description": (
+                        f"Political score {pol_score:+.4f} exceeds -0.7 threshold."
+                    ),
+                    "trigger_data": {"political_score": pol_score},
+                })
+
+        return alerts
+
     def create_alert(self, db: Session, alert_data: dict) -> bool:
         """Insert an alert into the alerts table.
 
@@ -285,6 +379,7 @@ class AlertEngine:
         all_alerts.extend(self.check_cycle_alerts(db, today))
         all_alerts.extend(self.check_celestial_alerts(db, today))
         all_alerts.extend(self.check_sentiment_alerts(db, symbol))
+        all_alerts.extend(self.check_political_alerts(db, symbol))
 
         for alert_data in all_alerts:
             if self.create_alert(db, alert_data):
