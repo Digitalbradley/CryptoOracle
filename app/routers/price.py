@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.price_data import PriceData
+from app.utils import normalize_symbol
 
 router = APIRouter(prefix="/api/prices", tags=["prices"])
 
@@ -20,8 +21,7 @@ def get_prices(
     db: Session = Depends(get_db),
 ):
     """Get the most recent candles for a symbol."""
-    # Normalize symbol: accept both BTC/USDT and BTC-USDT
-    symbol = symbol.replace("-", "/").upper()
+    symbol = normalize_symbol(symbol)
 
     stmt = (
         select(PriceData)
@@ -35,7 +35,7 @@ def get_prices(
         "symbol": symbol,
         "timeframe": timeframe,
         "count": len(rows),
-        "candles": [
+        "data": [
             {
                 "timestamp": r.timestamp.isoformat(),
                 "open": str(r.open),
@@ -58,7 +58,7 @@ def get_price_history(
     db: Session = Depends(get_db),
 ):
     """Get price history for a symbol within a date range."""
-    symbol = symbol.replace("-", "/").upper()
+    symbol = normalize_symbol(symbol)
 
     stmt = select(PriceData).where(
         PriceData.symbol == symbol,
@@ -76,7 +76,7 @@ def get_price_history(
         "symbol": symbol,
         "timeframe": timeframe,
         "count": len(rows),
-        "candles": [
+        "data": [
             {
                 "timestamp": r.timestamp.isoformat(),
                 "open": str(r.open),

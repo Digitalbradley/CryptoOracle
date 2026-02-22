@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.services.backtester import CycleBacktester, SignalBacktester
+from app.utils import normalize_symbol
 
 router = APIRouter(tags=["backtest"])
 
@@ -39,10 +40,11 @@ def run_cycle_backtest(
     Returns a full statistical report with chi-squared analysis,
     celestial cross-reference, and numerology cross-reference.
     """
+    symbol = normalize_symbol(body.symbol)
     backtester = CycleBacktester()
     report = backtester.generate_report(
         db,
-        symbol=body.symbol,
+        symbol=symbol,
         min_magnitude=body.min_magnitude,
     )
     return {"status": "complete", "report": report}
@@ -58,10 +60,11 @@ def run_signal_backtest(
     Replays historical data, computes what confluence scores would have been,
     and measures accuracy against actual price movements.
     """
+    symbol = normalize_symbol(body.symbol)
     backtester = SignalBacktester()
     predictions = backtester.replay_historical(
         db,
-        symbol=body.symbol,
+        symbol=symbol,
         timeframe=body.timeframe,
         start=body.start,
         end=body.end,
@@ -70,7 +73,7 @@ def run_signal_backtest(
 
     return {
         "status": "complete",
-        "symbol": body.symbol,
+        "symbol": symbol,
         "timeframe": body.timeframe,
         "total_days_replayed": len(predictions),
         "accuracy": accuracy,
@@ -86,10 +89,11 @@ def run_weight_optimizer(
 
     Tests weight combinations and returns the one with the best 7-day hit rate.
     """
+    symbol = normalize_symbol(body.symbol)
     backtester = SignalBacktester()
     result = backtester.optimize_weights(
         db,
-        symbol=body.symbol,
+        symbol=symbol,
         timeframe=body.timeframe,
     )
     return {"status": "complete", **result}

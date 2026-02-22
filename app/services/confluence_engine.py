@@ -242,6 +242,8 @@ class ConfluenceEngine:
         symbol: str,
         timeframe: str,
         timestamp: datetime | None = None,
+        *,
+        commit: bool = True,
     ) -> dict:
         """Gather scores, compute composite, and store to database.
 
@@ -291,7 +293,8 @@ class ConfluenceEngine:
             },
         )
         db.execute(stmt)
-        db.commit()
+        if commit:
+            db.commit()
 
         logger.info(
             "Confluence %s %s: composite=%.4f (%s), aligned=%d",

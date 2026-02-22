@@ -329,7 +329,9 @@ def fetch_all_metrics(symbol: str) -> dict:
     return metrics
 
 
-def upsert_onchain(db: Session, metrics: dict, symbol: str, timestamp: datetime) -> None:
+def upsert_onchain(
+    db: Session, metrics: dict, symbol: str, timestamp: datetime, *, commit: bool = True
+) -> None:
     """Persist on-chain metrics to onchain_metrics table."""
     score = compute_onchain_score(metrics)
 
@@ -365,7 +367,8 @@ def upsert_onchain(db: Session, metrics: dict, symbol: str, timestamp: datetime)
         set_=update_cols,
     )
     db.execute(stmt)
-    db.commit()
+    if commit:
+        db.commit()
 
 
 def fetch_and_store(db: Session, symbol: str) -> dict | None:

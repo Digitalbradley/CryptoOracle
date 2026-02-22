@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.models.onchain_metrics import OnchainMetrics
+from app.utils import normalize_symbol
 
 router = APIRouter(tags=["onchain"])
 
@@ -32,6 +33,7 @@ def get_onchain_status():
 @router.get("/api/onchain/{symbol}")
 def get_latest_onchain(symbol: str, db: Session = Depends(get_db)):
     """Get the latest on-chain metrics for a symbol."""
+    symbol = normalize_symbol(symbol)
     row = db.execute(
         select(OnchainMetrics)
         .where(OnchainMetrics.symbol == symbol)
@@ -75,6 +77,7 @@ def get_onchain_history(
     db: Session = Depends(get_db),
 ):
     """Get historical on-chain metrics for a symbol."""
+    symbol = normalize_symbol(symbol)
     query = select(OnchainMetrics).where(OnchainMetrics.symbol == symbol)
 
     if start:

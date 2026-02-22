@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.ta_indicators import TAIndicators
+from app.utils import normalize_symbol
 
 router = APIRouter(prefix="/api/signals", tags=["signals"])
 
@@ -52,7 +53,7 @@ def get_ta_indicators(
     db: Session = Depends(get_db),
 ):
     """Get the latest TA indicators for a symbol."""
-    symbol = symbol.replace("-", "/").upper()
+    symbol = normalize_symbol(symbol)
 
     stmt = (
         select(TAIndicators)
@@ -82,7 +83,7 @@ def get_ta_history(
     db: Session = Depends(get_db),
 ):
     """Get historical TA indicators for a symbol."""
-    symbol = symbol.replace("-", "/").upper()
+    symbol = normalize_symbol(symbol)
 
     stmt = select(TAIndicators).where(
         TAIndicators.symbol == symbol,
@@ -100,5 +101,5 @@ def get_ta_history(
         "symbol": symbol,
         "timeframe": timeframe,
         "count": len(rows),
-        "indicators": [_indicator_to_dict(r) for r in reversed(rows)],
+        "data": [_indicator_to_dict(r) for r in reversed(rows)],
     }

@@ -1,36 +1,30 @@
-"""Test the health check endpoint."""
+"""Tests for the health check endpoint."""
 
-from unittest.mock import MagicMock, patch
-
-from fastapi.testclient import TestClient
-
-from app.main import app
-
-client = TestClient(app)
+from tests.conftest import setup_scalar_one_or_none
+from unittest.mock import MagicMock
 
 
-def test_health_endpoint_returns_200():
-    """Health endpoint should return 200 with status info."""
-    # Mock the database dependency to avoid requiring a real DB for tests
-    mock_result = MagicMock()
-    mock_result.scalar.return_value = 1
+def test_health_ok(client, mock_db):
+    """Health endpoint returns 200 with connected database."""
+    result = MagicMock()
+    result.scalar.return_value = 1
+    mock_db.execute.return_value = result
 
-    mock_db = MagicMock()
-    mock_db.execute.return_value = mock_result
-
-    def override_get_db():
-        yield mock_db
-
-    from app.database import get_db
-
-    app.dependency_overrides[get_db] = override_get_db
-
-    response = client.get("/health")
-    assert response.status_code == 200
-    data = response.json()
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    data = resp.json()
     assert data["status"] == "ok"
     assert data["database"] == "connected"
     assert data["version"] == "0.1.0"
+    assert "build" in data
 
-    # Clean up override
-    app.dependency_overrides.clear()
+
+def test_health_db_error(client, mock_db):
+    """Health endpoint returns degraded when DB is unreachable."""
+    mock_db.execute.side_effect = Exception("connection refused")
+
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "degraded"
+    assert "error" in data["database"]

@@ -80,7 +80,7 @@ def get_celestial_history(
     rows = db.execute(stmt).scalars().all()
     return {
         "count": len(rows),
-        "states": [_state_to_dict(r) for r in reversed(rows)],
+        "data": [_state_to_dict(r) for r in reversed(rows)],
     }
 
 

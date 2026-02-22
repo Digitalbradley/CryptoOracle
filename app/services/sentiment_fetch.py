@@ -127,6 +127,8 @@ def upsert_sentiment(
     db: Session,
     fg_data: dict,
     symbol: str,
+    *,
+    commit: bool = True,
 ) -> None:
     """Persist Fear & Greed data to sentiment_data table.
 
@@ -134,6 +136,7 @@ def upsert_sentiment(
         db: SQLAlchemy session
         fg_data: {"value": int, "label": str, "timestamp": datetime}
         symbol: Trading pair (F&G is market-wide, stored per watched symbol)
+        commit: Whether to commit immediately (False for batch operations)
     """
     score = compute_sentiment_score(fg_data["value"])
 
@@ -155,7 +158,8 @@ def upsert_sentiment(
         },
     )
     db.execute(stmt)
-    db.commit()
+    if commit:
+        db.commit()
 
 
 def fetch_and_store_current(db: Session, symbols: list[str]) -> int:

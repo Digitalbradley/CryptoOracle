@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.alerts import Alerts
+from app.utils import normalize_symbol
 
 router = APIRouter(tags=["alerts"])
 
@@ -25,6 +26,7 @@ def list_alerts(
     if status != "all":
         query = query.where(Alerts.status == status)
     if symbol:
+        symbol = normalize_symbol(symbol)
         query = query.where(Alerts.symbol == symbol)
 
     query = query.order_by(Alerts.created_at.desc()).limit(limit)

@@ -1,6 +1,7 @@
 """FastAPI application entry point."""
 
 import logging
+import traceback
 from contextlib import asynccontextmanager
 
 from fastapi import BackgroundTasks, Depends, FastAPI
@@ -65,16 +66,17 @@ def bootstrap(
 ):
     """Trigger the initial data backfill and TA computation.
 
-    Runs in the background so the request returns immediately.
+    Runs synchronously — can take 10-20 minutes for large backfills.
     Monitor progress via server logs.
     """
-    from app.services.seed import run_bootstrap
+    try:
+        from app.services.seed import run_bootstrap
 
-    # Run bootstrap synchronously for now — the HTTP request will block
-    # until complete. For large backfills this can take 10-20 minutes.
-    # A future improvement would be to run this as a background task.
-    result = run_bootstrap(db)
-    return {"status": "complete", **result}
+        result = run_bootstrap(db)
+        return {"status": "complete", **result}
+    except Exception as e:
+        logger.exception("Phase 1 bootstrap failed")
+        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
 
 
 @app.post("/api/bootstrap/phase2", tags=["admin"])
@@ -84,16 +86,19 @@ def bootstrap_phase2(db: Session = Depends(get_db)):
     This can take several minutes for the full date range backfill.
     Monitor progress via server logs.
     """
-    from app.services.phase2_seed import run_phase2_bootstrap
+    try:
+        from app.services.phase2_seed import run_phase2_bootstrap
 
-    result = run_phase2_bootstrap(db)
-    return {"status": "complete", **result}
+        result = run_phase2_bootstrap(db)
+        return {"status": "complete", **result}
+    except Exception as e:
+        logger.exception("Phase 2 bootstrap failed")
+        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
 
 
 @app.post("/api/migrate", tags=["admin"])
 def run_migrations():
     """Run pending Alembic migrations."""
-    import traceback
     try:
         from alembic.config import Config
         from alembic import command
@@ -113,7 +118,6 @@ def bootstrap_phase3(db: Session = Depends(get_db)):
     This can take several minutes depending on data volume.
     Monitor progress via server logs.
     """
-    import traceback
     try:
         from app.services.phase3_seed import run_phase3_bootstrap
 

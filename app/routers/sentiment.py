@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.sentiment_data import SentimentData
+from app.utils import normalize_symbol
 
 router = APIRouter(tags=["sentiment"])
 
@@ -15,6 +16,7 @@ router = APIRouter(tags=["sentiment"])
 @router.get("/api/sentiment/{symbol}")
 def get_latest_sentiment(symbol: str, db: Session = Depends(get_db)):
     """Get the latest sentiment data for a symbol."""
+    symbol = normalize_symbol(symbol)
     row = db.execute(
         select(SentimentData)
         .where(SentimentData.symbol == symbol)
@@ -45,6 +47,7 @@ def get_sentiment_history(
     db: Session = Depends(get_db),
 ):
     """Get historical sentiment data for a symbol."""
+    symbol = normalize_symbol(symbol)
     query = select(SentimentData).where(SentimentData.symbol == symbol)
 
     if start:

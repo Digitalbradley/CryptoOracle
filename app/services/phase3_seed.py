@@ -81,7 +81,7 @@ def backfill_sentiment(db: Session, days: int = 730) -> int:
     total = 0
     for symbol in DEFAULT_SYMBOLS:
         for i, fg in enumerate(history):
-            upsert_sentiment(db, fg, symbol)
+            upsert_sentiment(db, fg, symbol, commit=False)
             total += 1
 
             if (i + 1) % 100 == 0:
@@ -91,6 +91,9 @@ def backfill_sentiment(db: Session, days: int = 730) -> int:
                     i + 1,
                     len(history),
                 )
+
+        # Commit once per symbol batch instead of per row
+        db.commit()
 
     logger.info("Sentiment backfill complete: %d rows across %d symbols", total, len(DEFAULT_SYMBOLS))
     return total
@@ -124,7 +127,7 @@ def backfill_confluence(db: Session) -> int:
         for i, ta in enumerate(ta_rows):
             try:
                 engine.compute_and_store(
-                    db, symbol, "1d", timestamp=ta.timestamp
+                    db, symbol, "1d", timestamp=ta.timestamp, commit=False
                 )
                 total += 1
             except Exception:
@@ -141,6 +144,9 @@ def backfill_confluence(db: Session) -> int:
                     i + 1,
                     len(ta_rows),
                 )
+
+        # Commit once per symbol batch
+        db.commit()
 
     logger.info("Confluence backfill complete: %d scores", total)
     return total

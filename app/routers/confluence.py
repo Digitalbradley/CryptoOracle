@@ -12,6 +12,7 @@ from app.database import get_db
 from app.models.confluence_scores import ConfluenceScores
 from app.models.signal_weights import SignalWeights
 from app.services.confluence_engine import ConfluenceEngine
+from app.utils import normalize_symbol
 
 router = APIRouter(tags=["confluence"])
 
@@ -88,6 +89,7 @@ def get_confluence(
 
     Computes on-the-fly from latest layer scores.
     """
+    symbol = normalize_symbol(symbol)
     engine = ConfluenceEngine()
     result = engine.compute_and_store(db, symbol, timeframe)
 
@@ -120,6 +122,7 @@ def get_confluence_history(
     db: Session = Depends(get_db),
 ):
     """Get historical confluence scores."""
+    symbol = normalize_symbol(symbol)
     query = select(ConfluenceScores).where(
         ConfluenceScores.symbol == symbol,
         ConfluenceScores.timeframe == timeframe,
