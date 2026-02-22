@@ -90,6 +90,22 @@ def bootstrap_phase2(db: Session = Depends(get_db)):
     return {"status": "complete", **result}
 
 
+@app.post("/api/migrate", tags=["admin"])
+def run_migrations():
+    """Run pending Alembic migrations."""
+    import traceback
+    try:
+        from alembic.config import Config
+        from alembic import command
+
+        alembic_cfg = Config("alembic.ini")
+        command.upgrade(alembic_cfg, "head")
+        return {"status": "complete", "message": "Migrations applied successfully"}
+    except Exception as e:
+        logger.exception("Migration failed")
+        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
+
+
 @app.post("/api/bootstrap/phase3", tags=["admin"])
 def bootstrap_phase3(db: Session = Depends(get_db)):
     """Trigger Phase 3 bootstrap: seed weights, backfill sentiment, compute confluence, run backtest.
