@@ -52,7 +52,7 @@ export default function ScoreGauge({ score, signalStrength, alignmentCount }: Sc
         className="text-xs font-mono"
         style={{ color: 'var(--text-muted)' }}
       >
-        {alignmentCount}/6 layers aligned
+        {alignmentCount}/7 layers aligned
       </p>
     </div>
   );

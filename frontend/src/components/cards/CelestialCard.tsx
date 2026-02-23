@@ -3,6 +3,7 @@ import { parseScore } from '../../types/api';
 import Card from '../ui/Card';
 import LayerBar from '../ui/LayerBar';
 import Skeleton from '../ui/Skeleton';
+import Tooltip from '../ui/Tooltip';
 
 const MOON_EMOJI: Record<string, string> = {
   'New Moon': '🌑',
@@ -51,7 +52,7 @@ export default function CelestialCard() {
 
   return (
     <Card title="Celestial" layerColor="var(--layer-celestial)">
-      <LayerBar label="Score" score={score} color="var(--layer-celestial)" />
+      <LayerBar label="Score" tooltip="Combines lunar, retrograde, and aspect signals" score={score} color="var(--layer-celestial)" />
 
       {/* Moon phase */}
       <div className="mt-3 flex items-center gap-2">
@@ -61,7 +62,9 @@ export default function CelestialCard() {
             {moonName}
           </p>
           <p className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>
-            {illumination.toFixed(0)}% illumination
+            <Tooltip text="Percentage of moon surface lit — correlates with market energy in lunar analysis">
+              {illumination.toFixed(0)}% illumination
+            </Tooltip>
           </p>
         </div>
       </div>
@@ -69,7 +72,9 @@ export default function CelestialCard() {
       {/* Retrogrades */}
       <div className="mt-3">
         <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>
-          Retrogrades ({state.retrograde_count})
+          <Tooltip text="Planets appearing to move backward — traditionally associated with reversals and uncertainty">
+            Retrogrades ({state.retrograde_count})
+          </Tooltip>
         </p>
         <div className="flex flex-wrap gap-1.5">
           {PLANETS.map((p) => {
@@ -112,10 +117,12 @@ export default function CelestialCard() {
       {/* Days to next moon events */}
       <div className="flex gap-4 mt-2">
         <span className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>
-          New ☽ {parseScore(state.days_to_next_new_moon).toFixed(0)}d
+          <Tooltip text="New beginnings — potential turning points">New ☽</Tooltip>{' '}
+          {parseScore(state.days_to_next_new_moon).toFixed(0)}d
         </span>
         <span className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>
-          Full ☽ {parseScore(state.days_to_next_full_moon).toFixed(0)}d
+          <Tooltip text="Peak illumination — may intensify trends or signal reversals">Full ☽</Tooltip>{' '}
+          {parseScore(state.days_to_next_full_moon).toFixed(0)}d
         </span>
       </div>
     </Card>

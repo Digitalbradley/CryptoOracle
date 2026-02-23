@@ -1,11 +1,14 @@
+import Tooltip from './Tooltip';
+
 interface LayerBarProps {
   label: string;
+  tooltip?: string;
   score: number;
   color: string;
   weight?: number;
 }
 
-export default function LayerBar({ label, score, color, weight }: LayerBarProps) {
+export default function LayerBar({ label, tooltip, score, color, weight }: LayerBarProps) {
   const clampedScore = Math.max(-1, Math.min(1, score));
   const pct = Math.abs(clampedScore) * 50;
   const isPositive = clampedScore >= 0;
@@ -17,7 +20,7 @@ export default function LayerBar({ label, score, color, weight }: LayerBarProps)
         className="text-xs w-20 shrink-0"
         style={{ color: 'var(--text-secondary)' }}
       >
-        {label}
+        {tooltip ? <Tooltip text={tooltip}>{label}</Tooltip> : label}
       </span>
 
       {/* Bar container */}
@@ -56,15 +59,17 @@ export default function LayerBar({ label, score, color, weight }: LayerBarProps)
         {clampedScore >= 0 ? '+' : ''}{clampedScore.toFixed(2)}
       </span>
 
-      {/* Optional weight */}
-      {weight != null && (
-        <span
-          className="font-mono text-[10px] w-8 text-right shrink-0"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          {(weight * 100).toFixed(0)}%
-        </span>
-      )}
+      {/* Weight */}
+      <span
+        className="font-mono text-[10px] w-8 text-right shrink-0"
+        style={{ color: 'var(--text-muted)' }}
+      >
+        {weight != null ? (
+          <Tooltip text="This layer's weight in the composite score">
+            {(weight * 100).toFixed(0)}%
+          </Tooltip>
+        ) : ''}
+      </span>
     </div>
   );
 }

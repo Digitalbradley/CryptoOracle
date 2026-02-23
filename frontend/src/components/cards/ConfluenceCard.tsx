@@ -7,13 +7,13 @@ import LayerBar from '../ui/LayerBar';
 import Skeleton from '../ui/Skeleton';
 
 const LAYERS = [
-  { key: 'ta_score' as const, label: 'Technical', color: 'var(--layer-ta)', weightKey: 'ta' as const },
-  { key: 'onchain_score' as const, label: 'On-Chain', color: 'var(--layer-onchain)', weightKey: 'onchain' as const },
-  { key: 'celestial_score' as const, label: 'Celestial', color: 'var(--layer-celestial)', weightKey: 'celestial' as const },
-  { key: 'numerology_score' as const, label: 'Numerology', color: 'var(--layer-numerology)', weightKey: 'numerology' as const },
-  { key: 'sentiment_score' as const, label: 'Sentiment', color: 'var(--layer-sentiment)', weightKey: 'sentiment' as const },
-  { key: 'political_score' as const, label: 'Political', color: 'var(--layer-political)', weightKey: 'political' as const },
-  { key: 'macro_score' as const, label: 'Macro', color: 'var(--layer-macro)', weightKey: 'macro' as const },
+  { key: 'ta_score' as const, label: 'Technical', tip: 'RSI, MACD, moving averages, Bollinger Bands', color: 'var(--layer-ta)', weightKey: 'ta' as const },
+  { key: 'onchain_score' as const, label: 'On-Chain', tip: 'Exchange flows, whale activity, NUPL, MVRV', color: 'var(--layer-onchain)', weightKey: 'onchain' as const },
+  { key: 'celestial_score' as const, label: 'Celestial', tip: 'Lunar phases, retrogrades, planetary aspects', color: 'var(--layer-celestial)', weightKey: 'celestial' as const },
+  { key: 'numerology_score' as const, label: 'Numerology', tip: 'Universal day numbers, master numbers, cycle hits', color: 'var(--layer-numerology)', weightKey: 'numerology' as const },
+  { key: 'sentiment_score' as const, label: 'Sentiment', tip: 'Fear & Greed Index (contrarian — fear = bullish)', color: 'var(--layer-sentiment)', weightKey: 'sentiment' as const },
+  { key: 'political_score' as const, label: 'Political', tip: 'FOMC, regulations, geopolitical risk, narratives', color: 'var(--layer-political)', weightKey: 'political' as const },
+  { key: 'macro_score' as const, label: 'Macro', tip: 'M2 supply, yields, DXY, oil, carry trade stress', color: 'var(--layer-macro)', weightKey: 'macro' as const },
 ];
 
 export default function ConfluenceCard() {
@@ -62,6 +62,7 @@ export default function ConfluenceCard() {
             <LayerBar
               key={layer.key}
               label={layer.label}
+              tooltip={layer.tip}
               score={score}
               color={layer.color}
               weight={weights?.[layer.weightKey]}

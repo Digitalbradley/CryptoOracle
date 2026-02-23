@@ -3,14 +3,24 @@ import { parseScore } from '../../types/api';
 import Card from '../ui/Card';
 import LayerBar from '../ui/LayerBar';
 import Skeleton from '../ui/Skeleton';
+import Tooltip from '../ui/Tooltip';
 
 const SUB_SIGNALS = [
-  { key: 'liquidity_score' as const, label: 'Liquidity', color: '#818cf8' },
-  { key: 'treasury_score' as const, label: 'Treasury', color: '#a78bfa' },
-  { key: 'dollar_score' as const, label: 'Dollar', color: '#34d399' },
-  { key: 'oil_score' as const, label: 'Oil', color: '#fbbf24' },
-  { key: 'carry_trade_score' as const, label: 'Carry Trade', color: '#f87171' },
+  { key: 'liquidity_score' as const, label: 'Liquidity', tip: 'Fed balance sheet + M2 money supply trends', color: '#818cf8' },
+  { key: 'treasury_score' as const, label: 'Treasury', tip: 'Yield curve shape, real rates, rate velocity', color: '#a78bfa' },
+  { key: 'dollar_score' as const, label: 'Dollar', tip: 'USD strength — strong dollar is bearish for crypto', color: '#34d399' },
+  { key: 'oil_score' as const, label: 'Oil', tip: 'WTI price momentum + inventory changes', color: '#fbbf24' },
+  { key: 'carry_trade_score' as const, label: 'Carry Trade', tip: 'USD/JPY stress, VIX, CFTC positioning risk', color: '#f87171' },
 ];
+
+const DATA_TIPS: Record<string, string> = {
+  'DXY': 'US Dollar Index (trade-weighted) — strong dollar is bearish for crypto',
+  'VIX': 'CBOE Volatility Index — measures market fear (higher = more uncertainty)',
+  '2s10s': 'Yield curve spread (2Y minus 10Y Treasury) — negative = recession risk',
+  'WTI': 'West Texas Intermediate crude oil price per barrel',
+  'USD/JPY': 'Dollar to Yen — falling = yen strengthening = carry unwind risk',
+  'M2 YoY': 'M2 money supply year-over-year change — expanding = more liquidity',
+};
 
 function regimeColor(regime: string | null): string {
   if (!regime) return 'var(--text-muted)';
@@ -73,7 +83,7 @@ export default function MacroCard() {
       <div className="flex items-center justify-between mb-3">
         <div>
           <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-            Regime
+            <Tooltip text="Current macro environment classification">Regime</Tooltip>
           </span>
           <div className="flex items-center gap-1.5">
             <span
@@ -110,25 +120,32 @@ export default function MacroCard() {
         {SUB_SIGNALS.map((sig) => {
           const score = parseScore(data.sub_signals[sig.key]);
           return (
-            <LayerBar key={sig.key} label={sig.label} score={score} color={sig.color} />
+            <LayerBar key={sig.key} label={sig.label} tooltip={sig.tip} score={score} color={sig.color} />
           );
         })}
       </div>
 
       {/* Key data points */}
-      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5">
-        <DataPoint label="DXY" value={data.data_points.dxy_value} />
-        <DataPoint label="VIX" value={data.data_points.vix_value} />
-        <DataPoint label="2s10s" value={data.data_points.yield_curve_2s10s} suffix="%" />
-        <DataPoint label="WTI" value={data.data_points.wti_price} prefix="$" />
-        <DataPoint label="USD/JPY" value={data.data_points.usdjpy_value} />
-        <DataPoint label="M2 YoY" value={data.data_points.m2_yoy_pct} suffix="%" />
+      <div className="mt-3">
+        <p className="text-[10px] uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>
+          Key Indicators
+        </p>
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+          <DataPoint label="DXY" value={data.data_points.dxy_value} />
+          <DataPoint label="VIX" value={data.data_points.vix_value} />
+          <DataPoint label="2s10s" value={data.data_points.yield_curve_2s10s} suffix="%" />
+          <DataPoint label="WTI" value={data.data_points.wti_price} prefix="$" />
+          <DataPoint label="USD/JPY" value={data.data_points.usdjpy_value} />
+          <DataPoint label="M2 YoY" value={data.data_points.m2_yoy_pct} suffix="%" />
+        </div>
       </div>
 
       {/* Carry stress indicator */}
       <div className="mt-3">
         <div className="flex justify-between mb-0.5">
-          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Carry Stress</span>
+          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+            <Tooltip text="Risk level in currency carry trades (0 = calm, 1 = crisis)">Carry Stress</Tooltip>
+          </span>
           <span className="font-mono text-[10px]" style={{ color: stressColor(carryStress) }}>
             {carryStress.toFixed(2)}
           </span>
@@ -159,9 +176,12 @@ function DataPoint({
   suffix?: string;
 }) {
   const num = parseScore(value);
+  const tip = DATA_TIPS[label];
   return (
     <div className="flex justify-between items-center">
-      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{label}</span>
+      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+        {tip ? <Tooltip text={tip}>{label}</Tooltip> : label}
+      </span>
       <span className="font-mono text-[11px]" style={{ color: 'var(--text-primary)' }}>
         {value ? `${prefix}${num.toFixed(2)}${suffix}` : '—'}
       </span>

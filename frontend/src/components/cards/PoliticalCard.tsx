@@ -3,6 +3,7 @@ import { parseScore } from '../../types/api';
 import Card from '../ui/Card';
 import LayerBar from '../ui/LayerBar';
 import Skeleton from '../ui/Skeleton';
+import Tooltip from '../ui/Tooltip';
 
 function directionArrow(dir: string | null): string {
   if (!dir) return '';
@@ -51,7 +52,9 @@ export default function PoliticalCard() {
         {/* Next major event */}
         {signal.next_event_type && (
           <div className="flex justify-between items-center">
-            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Next Event</span>
+            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              <Tooltip text="Upcoming scheduled event that may impact crypto (FOMC, CPI, elections, etc.)">Next Event</Tooltip>
+            </span>
             <div className="text-right">
               <span className="font-mono text-xs" style={{ color: 'var(--text-primary)' }}>
                 {signal.next_event_type}
@@ -67,7 +70,9 @@ export default function PoliticalCard() {
 
         {/* News volume */}
         <div className="flex justify-between items-center">
-          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>News (24h)</span>
+          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            <Tooltip text="Volume of crypto-relevant political news articles in last 24 hours">News (24h)</Tooltip>
+          </span>
           <span className="font-mono text-xs" style={{ color: 'var(--text-primary)' }}>
             {signal.news_volume_24h ?? 0} articles
           </span>
@@ -76,7 +81,9 @@ export default function PoliticalCard() {
         {/* Dominant narrative */}
         {signal.dominant_narrative && (
           <div>
-            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Narrative</span>
+            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              <Tooltip text="Most common theme across recent political news">Narrative</Tooltip>
+            </span>
             <div className="flex items-center gap-1 mt-0.5">
               <span className="text-xs" style={{ color: 'var(--text-primary)' }}>
                 {signal.dominant_narrative}
@@ -92,7 +99,9 @@ export default function PoliticalCard() {
         {signal.narrative_strength && (
           <div>
             <div className="flex justify-between mb-0.5">
-              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Strength</span>
+              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                <Tooltip text="Confidence in the dominant narrative (0 = weak consensus, 1 = strong)">Strength</Tooltip>
+              </span>
               <span className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>
                 {parseScore(signal.narrative_strength).toFixed(2)}
               </span>

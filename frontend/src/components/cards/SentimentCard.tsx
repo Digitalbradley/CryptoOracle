@@ -3,6 +3,7 @@ import { parseScore } from '../../types/api';
 import Card from '../ui/Card';
 import LayerBar from '../ui/LayerBar';
 import Skeleton from '../ui/Skeleton';
+import Tooltip from '../ui/Tooltip';
 
 function fgColor(index: number): string {
   if (index <= 25) return 'var(--signal-bearish)';
@@ -42,6 +43,11 @@ export default function SentimentCard() {
       <LayerBar label="Score" score={score} color="var(--layer-sentiment)" />
 
       <div className="mt-3 text-center">
+        <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>
+          <Tooltip text="Market sentiment (0-100). 0 = extreme fear, 100 = extreme greed. Contrarian — fear often means buying opportunity">
+            Fear & Greed Index
+          </Tooltip>
+        </p>
         <div
           className="font-mono text-3xl font-bold"
           style={{ color: fgColor(fgIndex) }}
