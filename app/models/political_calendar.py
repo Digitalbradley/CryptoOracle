@@ -4,7 +4,7 @@ import datetime as dt
 from decimal import Decimal
 
 from sqlalchemy import (
-    Boolean, DECIMAL, Date, Index, Integer, JSON, String, Text, func,
+    Boolean, DECIMAL, Date, Index, Integer, JSON, String, Text, UniqueConstraint, func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -45,6 +45,7 @@ class PoliticalCalendar(Base):
     )
 
     __table_args__ = (
+        UniqueConstraint("event_date", "event_type", name="uq_polcal_date_type"),
         Index("idx_polcal_date", "event_date"),
         Index("idx_polcal_type", "event_type", "event_date"),
         Index("idx_polcal_category", "category", "event_date"),
