@@ -6,6 +6,7 @@ def normalize_symbol(symbol: str) -> str:
 
     Accepts:
         BTC-USDT, BTCUSDT, btc/usdt, BTC/USDT → BTC/USDT
+        BTC, ETH, XRP → BTC/USDT, ETH/USDT, XRP/USDT
 
     This should be called at the router level before passing to any service.
     """
@@ -16,4 +17,7 @@ def normalize_symbol(symbol: str) -> str:
             if s.endswith(quote) and len(s) > len(quote):
                 s = s[: -len(quote)] + "/" + quote
                 break
+        else:
+            # Bare symbol (e.g. "BTC") → default to /USDT pair
+            s = s + "/USDT"
     return s
