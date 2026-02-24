@@ -7,7 +7,7 @@ Daily: Computes celestial state and numerology for the current date.
 """
 
 import logging
-from datetime import date
+from datetime import date, datetime, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy import select
@@ -236,11 +236,14 @@ def start_scheduler() -> None:
 
     _scheduler = BackgroundScheduler()
 
+    now = datetime.now(timezone.utc)
+
     # Hourly: fetch candles + recompute TA + confluence + alerts
     _scheduler.add_job(
         run_hourly_update,
         "interval",
         hours=1,
+        next_run_time=now,
         id="hourly_update",
         name="Hourly candle fetch + TA + confluence + alerts",
     )
@@ -250,6 +253,7 @@ def start_scheduler() -> None:
         run_political_news_update,
         "interval",
         minutes=30,
+        next_run_time=now,
         id="political_news_update",
         name="30-min political news fetch",
     )
@@ -259,6 +263,7 @@ def start_scheduler() -> None:
         run_sentiment_onchain_update,
         "interval",
         hours=4,
+        next_run_time=now,
         id="sentiment_onchain_update",
         name="4-hourly sentiment + on-chain fetch",
     )
@@ -268,6 +273,7 @@ def start_scheduler() -> None:
         run_macro_update,
         "interval",
         hours=4,
+        next_run_time=now,
         id="macro_update",
         name="4-hourly macro data fetch + signal compute",
     )
@@ -282,8 +288,16 @@ def start_scheduler() -> None:
         name="Daily celestial + numerology compute",
     )
 
+    # Also run esoteric immediately on startup so today's data exists
+    _scheduler.add_job(
+        run_daily_esoteric,
+        id="daily_esoteric_startup",
+        name="Startup celestial + numerology compute",
+        next_run_time=now,
+    )
+
     _scheduler.start()
-    logger.info("Scheduler started — hourly + 30-min + 4-hourly + macro + daily jobs enabled")
+    logger.info("Scheduler started — all jobs fire immediately then repeat on schedule")
 
 
 def stop_scheduler() -> None:

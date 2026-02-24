@@ -25,6 +25,9 @@ from app.models.political_signal import PoliticalSignal
 from app.models.sentiment_data import SentimentData
 from app.models.signal_weights import SignalWeights
 from app.models.ta_indicators import TAIndicators
+from app.signals.celestial import CelestialEngine
+from app.signals.numerology import compute_daily_numerology
+from app.services.sentiment_fetch import fetch_and_store_current
 
 logger = logging.getLogger(__name__)
 
@@ -98,35 +101,62 @@ class ConfluenceEngine:
         ).scalar_one_or_none()
         scores["ta_score"] = float(ta_row.ta_score) if ta_row and ta_row.ta_score else None
 
-        # Celestial: today
+        # Celestial: today — compute on-the-fly if not in DB
         today = date.today()
         today_start = datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
         cel_row = db.execute(
             select(CelestialState)
             .where(CelestialState.timestamp == today_start)
         ).scalar_one_or_none()
-        scores["celestial_score"] = (
-            float(cel_row.celestial_score) if cel_row and cel_row.celestial_score else None
-        )
+        if cel_row and cel_row.celestial_score is not None:
+            scores["celestial_score"] = float(cel_row.celestial_score)
+        else:
+            try:
+                engine = CelestialEngine()
+                state = engine.compute_daily_state(today, db)
+                cel_val = state.get("celestial_score") if isinstance(state, dict) else getattr(state, "celestial_score", None)
+                scores["celestial_score"] = float(cel_val) if cel_val is not None else None
+            except Exception:
+                logger.debug("Celestial on-the-fly computation failed")
+                scores["celestial_score"] = None
 
-        # Numerology: today
+        # Numerology: today — compute on-the-fly if not in DB
         num_row = db.execute(
             select(NumerologyDaily).where(NumerologyDaily.date == today)
         ).scalar_one_or_none()
-        scores["numerology_score"] = (
-            float(num_row.numerology_score) if num_row and num_row.numerology_score else None
-        )
+        if num_row and num_row.numerology_score is not None:
+            scores["numerology_score"] = float(num_row.numerology_score)
+        else:
+            try:
+                num_result = compute_daily_numerology(today, db)
+                num_val = num_result.get("numerology_score") if isinstance(num_result, dict) else getattr(num_result, "numerology_score", None)
+                scores["numerology_score"] = float(num_val) if num_val is not None else None
+            except Exception:
+                logger.debug("Numerology on-the-fly computation failed")
+                scores["numerology_score"] = None
 
-        # Sentiment: latest for symbol
+        # Sentiment: latest for symbol — fetch on-the-fly if not in DB
         sent_row = db.execute(
             select(SentimentData)
             .where(SentimentData.symbol == symbol)
             .order_by(SentimentData.timestamp.desc())
             .limit(1)
         ).scalar_one_or_none()
-        scores["sentiment_score"] = (
-            float(sent_row.sentiment_score) if sent_row and sent_row.sentiment_score else None
-        )
+        if sent_row and sent_row.sentiment_score is not None:
+            scores["sentiment_score"] = float(sent_row.sentiment_score)
+        else:
+            try:
+                fetch_and_store_current(db, [symbol])
+                sent_row = db.execute(
+                    select(SentimentData)
+                    .where(SentimentData.symbol == symbol)
+                    .order_by(SentimentData.timestamp.desc())
+                    .limit(1)
+                ).scalar_one_or_none()
+                scores["sentiment_score"] = float(sent_row.sentiment_score) if sent_row and sent_row.sentiment_score is not None else None
+            except Exception:
+                logger.debug("Sentiment on-the-fly fetch failed")
+                scores["sentiment_score"] = None
 
         # On-chain: latest for symbol
         oc_row = db.execute(
