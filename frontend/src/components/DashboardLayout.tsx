@@ -12,6 +12,7 @@ import OnchainCard from './cards/OnchainCard';
 import PoliticalCard from './cards/PoliticalCard';
 import MacroCard from './cards/MacroCard';
 import AlertsCard from './cards/AlertsCard';
+import InterpretationCard from './cards/InterpretationCard';
 import ChartCard from './cards/ChartCard';
 
 export default function DashboardLayout() {
@@ -35,6 +36,7 @@ export default function DashboardLayout() {
               <ChartCard />
               <TACard />
               <AlertsCard />
+              <InterpretationCard />
             </div>
 
             {/* Right column (2/5 on desktop) */}

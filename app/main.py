@@ -25,6 +25,7 @@ from app.routers import backtest
 from app.routers import political
 from app.routers import macro
 from app.routers import auth
+from app.routers import interpretation
 from app.services.auth_service import decode_access_token, ensure_admin_user
 from app.services.scheduler import start_scheduler, stop_scheduler
 
@@ -149,6 +150,7 @@ app.include_router(alerts_router.router)
 app.include_router(backtest.router)
 app.include_router(political.router)
 app.include_router(macro.router)
+app.include_router(interpretation.router)
 
 
 @app.post("/api/bootstrap", tags=["admin"])

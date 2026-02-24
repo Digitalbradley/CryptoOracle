@@ -250,3 +250,13 @@ export interface MacroSignalResponse {
   sub_signal_detail: Record<string, unknown> | null;
   status?: string;
 }
+
+// ---------- AI Interpretation ----------
+export interface InterpretationResponse {
+  summary: string;
+  layers: Record<string, string>;
+  watch: string;
+  bias: string;
+  generated_at: string;
+  cached: boolean;
+}
