@@ -3,12 +3,14 @@
 import logging
 import traceback
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import BackgroundTasks, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse
+from starlette.responses import FileResponse, JSONResponse
 
 from app.config import settings
 from app.database import SessionLocal, get_db
@@ -75,7 +77,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if path in PUBLIC_PATHS:
             return await call_next(request)
 
-        # Protected paths — require valid token
+        # Static files and SPA routes — allow through (auth handled client-side)
+        if not path.startswith("/api/"):
+            return await call_next(request)
+
+        # Protected API paths — require valid token
         if not token:
             return JSONResponse(
                 status_code=401,
@@ -256,3 +262,27 @@ def bootstrap_phase5(db: Session = Depends(get_db)):
     except Exception as e:
         logger.exception("Phase 5 bootstrap failed")
         return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
+
+
+# ---------------------------------------------------------------------------
+# Serve frontend static files (built by Vite into frontend/dist)
+# ---------------------------------------------------------------------------
+FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+
+if FRONTEND_DIST.is_dir():
+    # Mount static assets (JS, CSS, images) under /assets
+    app.mount(
+        "/assets",
+        StaticFiles(directory=str(FRONTEND_DIST / "assets")),
+        name="frontend-assets",
+    )
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """Serve the SPA index.html for all non-API, non-asset routes."""
+        # Try to serve a static file first (e.g. favicon.ico)
+        file_path = FRONTEND_DIST / full_path
+        if full_path and file_path.is_file():
+            return FileResponse(str(file_path))
+        # Fall back to index.html for client-side routing
+        return FileResponse(str(FRONTEND_DIST / "index.html"))
