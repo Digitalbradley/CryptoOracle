@@ -447,6 +447,7 @@ def fetch_and_store(db: Session, *, commit: bool = True) -> int:
             db.execute(stmt)
             count += 1
         except Exception:
+            db.rollback()
             logger.exception("Error processing article: %s", article.get("headline", "")[:80])
 
     if commit:
