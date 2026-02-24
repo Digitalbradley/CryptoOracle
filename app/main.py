@@ -268,6 +268,7 @@ def bootstrap_phase5(db: Session = Depends(get_db)):
 # Serve frontend static files (built by Vite into frontend/dist)
 # ---------------------------------------------------------------------------
 FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+logger.info("Frontend dist path: %s (exists=%s)", FRONTEND_DIST, FRONTEND_DIST.is_dir())
 
 if FRONTEND_DIST.is_dir():
     # Mount static assets (JS, CSS, images) under /assets
