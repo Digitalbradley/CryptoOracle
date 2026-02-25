@@ -508,6 +508,12 @@ class AlertEngine:
         db.add(alert)
         db.commit()
         logger.info("Alert created: [%s] %s", alert_data["severity"], alert_data["title"])
+
+        # Send email for critical/warning alerts
+        if alert.severity in ("critical", "warning"):
+            from app.services.email_service import send_alert_email
+            send_alert_email(alert)
+
         return True
 
     def run_all_checks(

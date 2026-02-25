@@ -46,8 +46,12 @@ class Settings(BaseSettings):
     twelve_data_api_key: str = Field(default="", alias="TWELVE_DATA_API_KEY")
     eia_api_key: str = Field(default="", alias="EIA_API_KEY")
 
-    # Notifications
+    # Notifications / Email
     alert_email: str = Field(default="", alias="ALERT_EMAIL")
+    smtp_host: str = Field(default="smtp.gmail.com", alias="SMTP_HOST")
+    smtp_port: int = Field(default=587, alias="SMTP_PORT")
+    smtp_user: str = Field(default="", alias="SMTP_USER")
+    smtp_password: str = Field(default="", alias="SMTP_PASSWORD")
 
     # App
     app_env: str = Field(default="development", alias="APP_ENV")
