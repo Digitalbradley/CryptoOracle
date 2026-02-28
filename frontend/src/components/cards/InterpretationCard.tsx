@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { useInterpretation } from '../../hooks/useInterpretation';
 import Card from '../ui/Card';
 import Skeleton from '../ui/Skeleton';
+import ChatPanel from './ChatPanel';
 
 const LAYER_LABELS: Record<string, string> = {
   ta: 'TA',
@@ -42,7 +44,8 @@ function timeAgo(isoStr: string): string {
 }
 
 export default function InterpretationCard() {
-  const { data, isLoading } = useInterpretation();
+  const { data, isLoading, isFetching, refresh } = useInterpretation();
+  const [chatOpen, setChatOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -70,6 +73,49 @@ export default function InterpretationCard() {
 
   return (
     <Card title="AI Analysis">
+      {/* Header row with refresh button */}
+      <div
+        className="flex items-center justify-end"
+        style={{ marginTop: -4, marginBottom: 4 }}
+      >
+        <button
+          onClick={refresh}
+          disabled={isFetching}
+          title="Refresh analysis"
+          style={{
+            background: 'none',
+            border: '1px solid var(--border-primary)',
+            borderRadius: 4,
+            padding: '3px 7px',
+            cursor: isFetching ? 'not-allowed' : 'pointer',
+            color: 'var(--text-muted)',
+            fontSize: 13,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            opacity: isFetching ? 0.5 : 1,
+            transition: 'opacity 0.2s',
+          }}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{
+              animation: isFetching ? 'spin 1s linear infinite' : 'none',
+            }}
+          >
+            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+          </svg>
+          {isFetching ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </div>
+
       {/* Summary */}
       <p className="text-sm leading-relaxed" style={{ color: 'var(--text-primary)' }}>
         {data.summary}
@@ -119,6 +165,38 @@ export default function InterpretationCard() {
           {data.generated_at ? timeAgo(data.generated_at) : ''}
         </span>
       </div>
+
+      {/* Chat toggle */}
+      <div style={{ marginTop: 12 }}>
+        <button
+          onClick={() => setChatOpen(!chatOpen)}
+          style={{
+            width: '100%',
+            background: 'none',
+            border: '1px solid var(--border-primary)',
+            borderRadius: 6,
+            padding: '8px 12px',
+            cursor: 'pointer',
+            color: 'var(--text-muted)',
+            fontSize: 12,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <span>{chatOpen ? 'Close chat' : 'Ask a question'}</span>
+          <span style={{ fontSize: 10, opacity: 0.6 }}>{chatOpen ? '▲' : '▼'}</span>
+        </button>
+
+        {chatOpen && <ChatPanel />}
+      </div>
+
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </Card>
   );
 }

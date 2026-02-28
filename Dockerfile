@@ -28,7 +28,7 @@ COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 # Alembic config + migrations need to be in place
 # (already copied with COPY . . above)
 
-EXPOSE 8000
+EXPOSE 8080
 
 COPY start.sh ./
 RUN chmod +x start.sh

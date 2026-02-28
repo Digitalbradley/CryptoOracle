@@ -260,3 +260,14 @@ export interface InterpretationResponse {
   generated_at: string;
   cached: boolean;
 }
+
+// ---------- AI Chat ----------
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatResponse {
+  response: string;
+  generated_at: string;
+}

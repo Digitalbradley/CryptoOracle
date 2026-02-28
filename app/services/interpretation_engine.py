@@ -56,11 +56,13 @@ class InterpretationEngine:
     """Generates AI-powered interpretations of confluence signals."""
 
     def interpret(
-        self, db: Session, symbol: str, timeframe: str = "1h"
+        self, db: Session, symbol: str, timeframe: str = "1h",
+        force: bool = False,
     ) -> dict:
         """Generate or return cached interpretation for a symbol.
 
         Returns dict with: summary, layers, watch, bias, generated_at, cached.
+        When *force* is True the cache is bypassed (but the new result is still cached).
         """
         if not settings.anthropic_api_key:
             return {
@@ -72,10 +74,11 @@ class InterpretationEngine:
                 "cached": False,
             }
 
-        # Check cache
         cache_key = f"{symbol}:{timeframe}"
         now = time.time()
-        if cache_key in _cache:
+
+        # Check cache (skip when force-refreshing)
+        if not force and cache_key in _cache:
             cached_at, cached_result = _cache[cache_key]
             if now - cached_at < CACHE_TTL_SECONDS:
                 return {**cached_result, "cached": True}
@@ -273,6 +276,58 @@ class InterpretationEngine:
                 "watch": "",
                 "bias": "neutral",
             }
+
+
+    def chat(
+        self,
+        db: Session,
+        symbol: str,
+        timeframe: str,
+        messages: list[dict],
+    ) -> str:
+        """Answer a follow-up question using live signal context.
+
+        *messages* is the full conversation history
+        ``[{"role": "user", "content": "..."}, ...]``.
+
+        Returns the assistant's plain-text reply.
+        """
+        import anthropic
+
+        if not settings.anthropic_api_key:
+            return "Configure ANTHROPIC_API_KEY to enable chat."
+
+        context = self._gather_context(db, symbol, timeframe)
+
+        # Grab latest cached interpretation summary if available
+        cache_key = f"{symbol}:{timeframe}"
+        cached_summary = ""
+        if cache_key in _cache:
+            _, cached_result = _cache[cache_key]
+            cached_summary = cached_result.get("summary", "")
+
+        system = (
+            "You are CryptoOracle's AI market analyst. You have access to real-time "
+            f"signal data for {symbol}. Answer questions about these signals directly "
+            "and specifically, referencing the actual numbers shown below.\n\n"
+            f"Current signal data:\n{json.dumps(context, indent=2, default=str)}"
+        )
+        if cached_summary:
+            system += f"\n\nCurrent AI interpretation:\n{cached_summary}"
+
+        client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+
+        try:
+            response = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=2048,
+                system=system,
+                messages=messages,
+            )
+            return response.content[0].text
+        except Exception:
+            logger.exception("Chat API call failed for %s", symbol)
+            return "Sorry, I couldn't process that request. Please try again."
 
 
 def _f(val) -> float | None:
