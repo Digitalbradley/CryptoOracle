@@ -232,9 +232,10 @@ def run_phase6_bootstrap(db: Session) -> dict:
         results["xrpl_fetch"] = xrpl_result
     except Exception:
         logger.exception("XRPL initial fetch failed (non-fatal)")
+        db.rollback()  # ensure clean session for composite
         results["xrpl_fetch"] = "failed"
 
-    # 5. Compute initial XAI composite
+    # 5. Compute initial XAI composite (works with partnerships alone)
     try:
         from app.services.xai_signal_service import compute_xai_composite
         xai_result = compute_xai_composite(db)
@@ -242,6 +243,7 @@ def run_phase6_bootstrap(db: Session) -> dict:
         results["adoption_phase"] = xai_result["adoption_phase"]
     except Exception:
         logger.exception("Initial XAI computation failed (non-fatal)")
+        db.rollback()
         results["xai_score"] = "failed"
 
     logger.info("Phase 6 bootstrap complete: %s", results)

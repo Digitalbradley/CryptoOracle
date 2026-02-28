@@ -20,7 +20,7 @@ from app.models.xai import XaiOnchainMetrics
 
 logger = logging.getLogger(__name__)
 
-XRPL_RPC_URL = "https://s1.ripple.com:51234/"
+XRPL_RPC_URL = "https://xrplcluster.com/"
 # RLUSD issuer account on XRPL (Ripple's stablecoin gateway)
 RLUSD_ISSUER = "rMxCKbEDwqr76QuheSUMdEGf4B9xJ8m5De"
 RLUSD_CURRENCY = "524C555344000000000000000000000000000000"  # hex-encoded "RLUSD"
