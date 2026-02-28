@@ -30,7 +30,6 @@ class XaiOnchainMetrics(Base):
 
     __tablename__ = "xai_onchain_metrics"
 
-    id: Mapped[int] = mapped_column(BigInteger, autoincrement=True)
     timestamp: Mapped[datetime] = mapped_column(primary_key=True)
 
     # Volume metrics
@@ -67,7 +66,6 @@ class XaiComposite(Base):
 
     __tablename__ = "xai_composite"
 
-    id: Mapped[int] = mapped_column(BigInteger, autoincrement=True)
     timestamp: Mapped[datetime] = mapped_column(primary_key=True)
 
     # Sub-signals (each -1.0 to +1.0)
