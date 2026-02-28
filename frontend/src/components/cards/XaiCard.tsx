@@ -1,4 +1,4 @@
-import { useXaiScore, useXaiCalendar } from '../../hooks/useXai';
+import { useXaiScore, useXaiCalendar, useXaiPolicies } from '../../hooks/useXai';
 import { parseScore } from '../../types/api';
 import Card from '../ui/Card';
 import LayerBar from '../ui/LayerBar';
@@ -47,6 +47,7 @@ function impactColor(impact: string | null): string {
 export default function XaiCard() {
   const { data, isLoading } = useXaiScore();
   const { data: calendarData } = useXaiCalendar();
+  const { data: policiesData } = useXaiPolicies();
 
   if (isLoading) {
     return (
@@ -169,14 +170,14 @@ export default function XaiCard() {
         {data.policy_pipeline_score ? (
           <LayerBar
             label="Policy"
-            tooltip="Regulatory and policy environment favorability"
+            tooltip="BIS/FSB/SEC regulatory environment — cross-border payments, DLT favorability, stablecoin stance"
             score={parseScore(data.policy_pipeline_score)}
             color="#c084fc"
           />
         ) : (
           <div className="flex items-center gap-2 py-1">
             <span className="text-xs w-20 shrink-0" style={{ color: 'var(--text-muted)' }}>Policy</span>
-            <span className="text-[10px] italic" style={{ color: 'var(--text-muted)' }}>Phase B</span>
+            <span className="text-[10px] italic" style={{ color: 'var(--text-muted)' }}>Awaiting data</span>
           </div>
         )}
         {data.personnel_intelligence_score ? (
@@ -206,6 +207,34 @@ export default function XaiCard() {
           <MetricItem label="U/S Ratio" value={ratio > 0 ? ratio.toFixed(4) : '—'} />
         </div>
       </div>
+
+      {/* Recent policy events */}
+      {policiesData && policiesData.events.length > 0 && (
+        <div className="mt-3">
+          <p className="text-[10px] uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>
+            Recent Policy
+          </p>
+          <div className="space-y-1">
+            {policiesData.events.slice(0, 3).map((ev) => (
+              <div key={ev.id} className="flex items-center justify-between">
+                <span
+                  className="text-[10px] truncate"
+                  style={{
+                    color: parseScore(ev.policy_impact_score) > 0 ? 'var(--signal-bullish)' : parseScore(ev.policy_impact_score) < 0 ? 'var(--signal-bearish)' : 'var(--text-secondary)',
+                    maxWidth: '65%',
+                  }}
+                >
+                  {ev.xrp_mentioned && <span style={{ color: '#818cf8' }}>XRP </span>}
+                  {ev.title.length > 50 ? ev.title.slice(0, 50) + '...' : ev.title}
+                </span>
+                <span className="text-[10px] font-mono shrink-0" style={{ color: 'var(--text-muted)' }}>
+                  {ev.source}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Upcoming events */}
       {calendarData && calendarData.events.length > 0 && (

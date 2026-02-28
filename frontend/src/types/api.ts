@@ -292,6 +292,23 @@ export interface XaiCalendarResponse {
   events: XaiCalendarEvent[];
 }
 
+export interface XaiPolicyEvent {
+  id: number;
+  timestamp: string;
+  source: string;
+  event_type: string | null;
+  title: string;
+  url: string | null;
+  policy_impact_score: string | null;
+  xrp_mentioned: boolean;
+  dlt_favorability: string | null;
+}
+
+export interface XaiPoliciesResponse {
+  count: number;
+  events: XaiPolicyEvent[];
+}
+
 // ---------- AI Chat ----------
 export interface ChatMessage {
   role: 'user' | 'assistant';

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '../api/client';
-import type { XaiScoreResponse, XaiCalendarResponse } from '../types/api';
+import type { XaiScoreResponse, XaiCalendarResponse, XaiPoliciesResponse } from '../types/api';
 
 export function useXaiScore() {
   return useQuery<XaiScoreResponse>({
@@ -18,6 +18,17 @@ export function useXaiCalendar() {
     queryKey: ['xai-calendar'],
     queryFn: async () => {
       const { data } = await api.get<XaiCalendarResponse>('/api/xai/calendar');
+      return data;
+    },
+    refetchInterval: 30 * 60_000,
+  });
+}
+
+export function useXaiPolicies() {
+  return useQuery<XaiPoliciesResponse>({
+    queryKey: ['xai-policies'],
+    queryFn: async () => {
+      const { data } = await api.get<XaiPoliciesResponse>('/api/xai/policies');
       return data;
     },
     refetchInterval: 30 * 60_000,

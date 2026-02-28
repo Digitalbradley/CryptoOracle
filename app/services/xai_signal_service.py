@@ -1,19 +1,24 @@
 """XAI signal computation — computes sub-signals and composite XAI score.
 
 Phase A: on-chain utility + partnership deployment scores.
-Phase B will add: policy pipeline score.
+Phase B: + policy pipeline score.
 Phase C will add: personnel intelligence score.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from app.models.xai import XaiComposite, XaiOnchainMetrics, XaiPartnership
+from app.models.xai import (
+    XaiComposite,
+    XaiOnchainMetrics,
+    XaiPartnership,
+    XaiPolicyEvent,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +128,52 @@ def compute_partnership_score(db: Session) -> float:
     return max(-1.0, min(1.0, round(score, 4)))
 
 
+def compute_policy_pipeline_score(db: Session, days_window: int = 90) -> float | None:
+    """Score the regulatory/policy pipeline from recent xai_policy_events.
+
+    Weighted average of policy_impact_score, weighted by
+    (cross_border_relevance + timeline_urgency) and recency.
+    Returns -1.0 to +1.0, or None if no policy data exists.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days_window)
+
+    rows = db.execute(
+        select(XaiPolicyEvent)
+        .where(
+            XaiPolicyEvent.timestamp >= cutoff,
+            XaiPolicyEvent.policy_impact_score.isnot(None),
+        )
+        .order_by(XaiPolicyEvent.timestamp.desc())
+    ).scalars().all()
+
+    if not rows:
+        return None  # No data yet — signal not active
+
+    total_weight = 0.0
+    weighted_sum = 0.0
+
+    for r in rows:
+        impact = float(r.policy_impact_score or 0)
+        relevance = float(r.cross_border_relevance or 0.5)
+        urgency = float(r.timeline_urgency or 0.3)
+
+        # Recency decay: newer events count more
+        age_days = (datetime.now(timezone.utc) - r.timestamp).days
+        recency = max(0.1, 1.0 - (age_days / days_window))
+
+        # XRP mention boost
+        xrp_boost = 1.5 if r.xrp_mentioned else 1.0
+
+        weight = (relevance + urgency) * recency * xrp_boost
+        weighted_sum += impact * weight
+        total_weight += weight
+
+    if total_weight == 0:
+        return 0.0
+
+    return round(max(-1.0, min(1.0, weighted_sum / total_weight)), 4)
+
+
 def determine_adoption_phase(ratio: float, xai_score: float) -> str:
     """Classify the current adoption phase."""
     if ratio > 1.0:
@@ -148,12 +199,16 @@ def compute_xai_composite(db: Session) -> dict:
     # Compute available sub-signals
     onchain_score = compute_onchain_utility_score(db)
     partnership_score = compute_partnership_score(db)
+    policy_score = compute_policy_pipeline_score(db)
 
-    # Phase A: only on-chain + partnerships. Renormalize weights.
+    # Build available signals — only include those with data
     available = {
         "onchain_utility": (onchain_score, FULL_WEIGHTS["onchain_utility"]),
         "partnerships": (partnership_score, FULL_WEIGHTS["partnerships"]),
     }
+    if policy_score is not None:
+        available["policy_pipeline"] = (policy_score, FULL_WEIGHTS["policy_pipeline"])
+
     total_weight = sum(w for _, w in available.values())
 
     if total_weight > 0:
@@ -186,8 +241,10 @@ def compute_xai_composite(db: Session) -> dict:
 
     phase = determine_adoption_phase(ratio, xai_score)
 
+    policy_rounded = round(policy_score, 4) if policy_score is not None else None
+
     result = {
-        "policy_pipeline_score": None,
+        "policy_pipeline_score": policy_rounded,
         "partnership_deployment_score": round(partnership_score, 4),
         "onchain_utility_score": round(onchain_score, 4),
         "personnel_intelligence_score": None,
@@ -201,9 +258,10 @@ def compute_xai_composite(db: Session) -> dict:
     }
 
     # Store
+    policy_dec = Decimal(str(policy_score)) if policy_score is not None else None
     row = {
         "timestamp": now,
-        "policy_pipeline_score": None,
+        "policy_pipeline_score": policy_dec,
         "partnership_deployment_score": Decimal(str(partnership_score)),
         "onchain_utility_score": Decimal(str(onchain_score)),
         "personnel_intelligence_score": None,
@@ -225,8 +283,9 @@ def compute_xai_composite(db: Session) -> dict:
     db.commit()
 
     logger.info(
-        "XAI composite: score=%.4f phase=%s ratio=%.6f partners=%d/%d",
+        "XAI composite: score=%.4f phase=%s ratio=%.6f partners=%d/%d policy=%s",
         xai_score, phase, ratio, prod_partners, total_partners,
+        policy_rounded,
     )
 
     return result

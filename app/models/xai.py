@@ -1,7 +1,7 @@
-"""XRP Adoption Intelligence (XAI) models — Phase A.
+"""XRP Adoption Intelligence (XAI) models — Phases A + B.
 
 Tables: xai_onchain_metrics, xai_composite, xai_partnerships,
-        xai_tracked_entities, xai_event_calendar.
+        xai_tracked_entities, xai_event_calendar, xai_policy_events.
 """
 
 from datetime import date, datetime
@@ -11,12 +11,14 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     Date,
+    DateTime,
     DECIMAL,
     Index,
     Integer,
     JSON,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -166,4 +168,38 @@ class XaiEventCalendar(Base):
     recurrence_pattern: Mapped[str | None] = mapped_column(String(50))
     source_url: Mapped[str | None] = mapped_column(Text)
 
+    created_at: Mapped[datetime | None] = mapped_column(
+        default=datetime.utcnow
+    )
+
+
+# ---------- Policy events (Phase B) ----------
+
+class XaiPolicyEvent(Base):
+    """Classified regulatory/policy events from BIS, FSB, SEC, etc."""
+
+    __tablename__ = "xai_policy_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    source: Mapped[str] = mapped_column(String(100), nullable=False)
+    event_type: Mapped[str | None] = mapped_column(String(50))
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    summary: Mapped[str | None] = mapped_column(Text)
+    url: Mapped[str | None] = mapped_column(Text)
+
+    # Claude classification scores
+    cross_border_relevance: Mapped[Decimal | None] = mapped_column(DECIMAL(3, 2))
+    dlt_favorability: Mapped[Decimal | None] = mapped_column(DECIMAL(4, 2))
+    stablecoin_stance: Mapped[Decimal | None] = mapped_column(DECIMAL(4, 2))
+    regulatory_direction: Mapped[Decimal | None] = mapped_column(DECIMAL(4, 2))
+    timeline_urgency: Mapped[Decimal | None] = mapped_column(DECIMAL(3, 2))
+    xrp_mentioned: Mapped[bool] = mapped_column(Boolean, default=False)
+    policy_impact_score: Mapped[Decimal | None] = mapped_column(DECIMAL(4, 2))
+
     created_at: Mapped[datetime | None] = mapped_column(default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("source", "title", name="uq_xai_policy_source_title"),
+        Index("idx_xai_policy_ts", "timestamp"),
+    )

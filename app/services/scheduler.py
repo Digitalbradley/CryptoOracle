@@ -257,6 +257,36 @@ def run_xai_update() -> None:
         db.close()
 
 
+def run_xai_policy_update() -> None:
+    """Scrape BIS/FSB/SEC/Ripple for policy events, classify, recompute XAI.
+
+    Runs every 6 hours in its own DB session.
+    """
+    logger.info("XAI policy update starting...")
+    db = SessionLocal()
+
+    try:
+        # Scrape and classify policy events
+        try:
+            from app.services.xai_policy_fetch import fetch_and_classify
+            result = fetch_and_classify(db)
+            logger.info("XAI policy fetch: %s", result)
+        except Exception:
+            logger.exception("Error in XAI policy fetch")
+
+        # Recompute XAI composite (picks up new policy score)
+        try:
+            from app.services.xai_signal_service import compute_xai_composite
+            result = compute_xai_composite(db)
+            logger.info("XAI composite (post-policy): score=%.4f", result["xai_score"])
+        except Exception:
+            logger.exception("Error recomputing XAI composite after policy update")
+
+        logger.info("XAI policy update complete.")
+    finally:
+        db.close()
+
+
 def start_scheduler() -> None:
     """Start the background scheduler with all jobs."""
     global _scheduler
@@ -316,6 +346,16 @@ def start_scheduler() -> None:
         next_run_time=now,
         id="xai_update",
         name="4-hourly XAI XRPL fetch + composite compute",
+    )
+
+    # Every 6 hours: XAI policy pipeline (BIS/FSB/SEC scrape + classify)
+    _scheduler.add_job(
+        run_xai_policy_update,
+        "interval",
+        hours=6,
+        next_run_time=now,
+        id="xai_policy_update",
+        name="6-hourly XAI policy scrape + classify",
     )
 
     # Daily at 00:05 UTC: celestial + numerology

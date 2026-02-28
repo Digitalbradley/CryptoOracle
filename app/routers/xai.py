@@ -1,6 +1,6 @@
-"""XAI (XRP Adoption Intelligence) router — on-chain metrics, partnerships, events."""
+"""XAI (XRP Adoption Intelligence) router — on-chain metrics, partnerships, events, policies."""
 
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
@@ -12,6 +12,7 @@ from app.models.xai import (
     XaiEventCalendar,
     XaiOnchainMetrics,
     XaiPartnership,
+    XaiPolicyEvent,
 )
 
 router = APIRouter(tags=["xai"])
@@ -160,3 +161,35 @@ def get_xai_ratio(db: Session = Depends(get_db)):
     latest = history[0] if history else None
 
     return {"latest": latest, "history": history}
+
+
+@router.get("/api/xai/policies")
+def get_xai_policies(days: int = 90, db: Session = Depends(get_db)):
+    """Get recent classified policy/regulatory events."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    rows = db.execute(
+        select(XaiPolicyEvent)
+        .where(XaiPolicyEvent.timestamp >= cutoff)
+        .order_by(XaiPolicyEvent.timestamp.desc())
+        .limit(50)
+    ).scalars().all()
+
+    events = []
+    for e in rows:
+        events.append({
+            "id": e.id,
+            "timestamp": e.timestamp.isoformat(),
+            "source": e.source,
+            "event_type": e.event_type,
+            "title": e.title,
+            "url": e.url,
+            "cross_border_relevance": str(e.cross_border_relevance) if e.cross_border_relevance else None,
+            "dlt_favorability": str(e.dlt_favorability) if e.dlt_favorability else None,
+            "stablecoin_stance": str(e.stablecoin_stance) if e.stablecoin_stance else None,
+            "regulatory_direction": str(e.regulatory_direction) if e.regulatory_direction else None,
+            "timeline_urgency": str(e.timeline_urgency) if e.timeline_urgency else None,
+            "xrp_mentioned": e.xrp_mentioned,
+            "policy_impact_score": str(e.policy_impact_score) if e.policy_impact_score else None,
+        })
+
+    return {"count": len(events), "events": events}
