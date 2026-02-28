@@ -230,10 +230,11 @@ def run_phase6_bootstrap(db: Session) -> dict:
         from app.services.xrpl_fetch import fetch_and_store
         xrpl_result = fetch_and_store(db)
         results["xrpl_fetch"] = xrpl_result
-    except Exception:
+    except Exception as exc:
+        import traceback
         logger.exception("XRPL initial fetch failed (non-fatal)")
         db.rollback()  # ensure clean session for composite
-        results["xrpl_fetch"] = "failed"
+        results["xrpl_fetch"] = {"error": str(exc), "traceback": traceback.format_exc()}
 
     # 5. Compute initial XAI composite (works with partnerships alone)
     try:
@@ -241,10 +242,11 @@ def run_phase6_bootstrap(db: Session) -> dict:
         xai_result = compute_xai_composite(db)
         results["xai_score"] = xai_result["xai_score"]
         results["adoption_phase"] = xai_result["adoption_phase"]
-    except Exception:
+    except Exception as exc:
+        import traceback
         logger.exception("Initial XAI computation failed (non-fatal)")
         db.rollback()
-        results["xai_score"] = "failed"
+        results["xai_score"] = {"error": str(exc), "traceback": traceback.format_exc()}
 
     logger.info("Phase 6 bootstrap complete: %s", results)
     return results
