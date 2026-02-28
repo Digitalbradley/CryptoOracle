@@ -11,6 +11,7 @@ import SentimentCard from './cards/SentimentCard';
 import OnchainCard from './cards/OnchainCard';
 import PoliticalCard from './cards/PoliticalCard';
 import MacroCard from './cards/MacroCard';
+import XaiCard from './cards/XaiCard';
 import AlertsCard from './cards/AlertsCard';
 import InterpretationCard from './cards/InterpretationCard';
 import ChartCard from './cards/ChartCard';
@@ -43,6 +44,7 @@ export default function DashboardLayout() {
             <div className="lg:col-span-2 space-y-3 lg:space-y-4">
               <ConfluenceCard />
               <MacroCard />
+              <XaiCard />
               <CelestialCard />
               <NumerologyCard />
               <PoliticalCard />

@@ -24,6 +24,7 @@ class ConfluenceScores(Base):
     sentiment_score: Mapped[Decimal | None] = mapped_column(DECIMAL(5, 4))
     political_score: Mapped[Decimal | None] = mapped_column(DECIMAL(5, 4))
     macro_score: Mapped[Decimal | None] = mapped_column(DECIMAL(5, 4))
+    xai_score: Mapped[Decimal | None] = mapped_column(DECIMAL(5, 4))
 
     weights: Mapped[dict] = mapped_column(JSON, nullable=False)
 

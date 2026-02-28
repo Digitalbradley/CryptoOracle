@@ -25,6 +25,13 @@ from app.models.signal_weights import SignalWeights
 from app.models.ta_indicators import TAIndicators
 from app.models.user import User
 from app.models.watched_symbols import WatchedSymbols
+from app.models.xai import (
+    XaiComposite,
+    XaiEventCalendar,
+    XaiOnchainMetrics,
+    XaiPartnership,
+    XaiTrackedEntity,
+)
 
 __all__ = [
     "Alerts",
@@ -50,4 +57,9 @@ __all__ = [
     "TAIndicators",
     "User",
     "WatchedSymbols",
+    "XaiComposite",
+    "XaiEventCalendar",
+    "XaiOnchainMetrics",
+    "XaiPartnership",
+    "XaiTrackedEntity",
 ]

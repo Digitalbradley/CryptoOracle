@@ -261,6 +261,37 @@ export interface InterpretationResponse {
   cached: boolean;
 }
 
+// ---------- XAI (XRP Adoption Intelligence) ----------
+export interface XaiScoreResponse {
+  status?: string;
+  timestamp: string;
+  xai_score: string | null;
+  policy_pipeline_score: string | null;
+  partnership_deployment_score: string | null;
+  onchain_utility_score: string | null;
+  personnel_intelligence_score: string | null;
+  utility_to_speculation_ratio: string | null;
+  rlusd_market_cap: string | null;
+  active_partnership_count: number | null;
+  partnerships_in_production: number | null;
+  adoption_phase: string | null;
+  weights: Record<string, string> | null;
+}
+
+export interface XaiCalendarEvent {
+  id: number;
+  event_date: string;
+  event_name: string;
+  event_type: string | null;
+  potential_impact: string | null;
+  xrp_relevance: string | null;
+}
+
+export interface XaiCalendarResponse {
+  count: number;
+  events: XaiCalendarEvent[];
+}
+
 // ---------- AI Chat ----------
 export interface ChatMessage {
   role: 'user' | 'assistant';

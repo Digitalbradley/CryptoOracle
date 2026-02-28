@@ -28,6 +28,7 @@ from app.routers import political
 from app.routers import macro
 from app.routers import auth
 from app.routers import interpretation
+from app.routers import xai
 from app.services.auth_service import decode_access_token, ensure_admin_user
 from app.services.scheduler import start_scheduler, stop_scheduler
 
@@ -157,6 +158,7 @@ app.include_router(backtest.router)
 app.include_router(political.router)
 app.include_router(macro.router)
 app.include_router(interpretation.router)
+app.include_router(xai.router)
 
 
 @app.post("/api/bootstrap", tags=["admin"])
@@ -261,6 +263,23 @@ def bootstrap_phase5(db: Session = Depends(get_db)):
         return {"status": "complete", **result}
     except Exception as e:
         logger.exception("Phase 5 bootstrap failed")
+        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
+
+
+@app.post("/api/bootstrap/phase6", tags=["admin"])
+def bootstrap_phase6(db: Session = Depends(get_db)):
+    """Trigger Phase 6 bootstrap: XRP Adoption Intelligence (XAI).
+
+    Seeds known partnerships, tracked entities, institutional event calendar,
+    then fetches initial XRPL data and computes XAI composite score.
+    """
+    try:
+        from app.services.phase6_seed import run_phase6_bootstrap
+
+        result = run_phase6_bootstrap(db)
+        return {"status": "complete", **result}
+    except Exception as e:
+        logger.exception("Phase 6 bootstrap failed")
         return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
 
 

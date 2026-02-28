@@ -227,6 +227,36 @@ def run_macro_update() -> None:
         db.close()
 
 
+def run_xai_update() -> None:
+    """Fetch XRPL on-chain data and recompute XAI composite score.
+
+    Runs every 4 hours in its own DB session.
+    """
+    logger.info("XAI update starting...")
+    db = SessionLocal()
+
+    try:
+        # Fetch XRPL metrics
+        try:
+            from app.services.xrpl_fetch import fetch_and_store
+            result = fetch_and_store(db)
+            logger.info("XRPL fetch: %s", result)
+        except Exception:
+            logger.exception("Error in XRPL fetch")
+
+        # Compute XAI composite
+        try:
+            from app.services.xai_signal_service import compute_xai_composite
+            result = compute_xai_composite(db)
+            logger.info("XAI composite: score=%.4f phase=%s", result["xai_score"], result["adoption_phase"])
+        except Exception:
+            logger.exception("Error computing XAI composite")
+
+        logger.info("XAI update complete.")
+    finally:
+        db.close()
+
+
 def start_scheduler() -> None:
     """Start the background scheduler with all jobs."""
     global _scheduler
@@ -276,6 +306,16 @@ def start_scheduler() -> None:
         next_run_time=now,
         id="macro_update",
         name="4-hourly macro data fetch + signal compute",
+    )
+
+    # Every 4 hours: XAI (XRPL on-chain + composite)
+    _scheduler.add_job(
+        run_xai_update,
+        "interval",
+        hours=4,
+        next_run_time=now,
+        id="xai_update",
+        name="4-hourly XAI XRPL fetch + composite compute",
     )
 
     # Daily at 00:05 UTC: celestial + numerology
