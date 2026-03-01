@@ -2,7 +2,7 @@
 
 Phase A: on-chain utility + partnership deployment scores.
 Phase B: + policy pipeline score.
-Phase C will add: personnel intelligence score.
+Phase C: + personnel intelligence score. All 4 sub-signals active.
 """
 
 import logging
@@ -17,6 +17,7 @@ from app.models.xai import (
     XaiComposite,
     XaiOnchainMetrics,
     XaiPartnership,
+    XaiPersonnelIntelligence,
     XaiPolicyEvent,
 )
 
@@ -178,6 +179,52 @@ def compute_policy_pipeline_score(db: Session, days_window: int = 90) -> float |
     return round(max(-1.0, min(1.0, weighted_sum / total_weight)), 4)
 
 
+def compute_personnel_score(db: Session, days_window: int = 90) -> float | None:
+    """Score personnel intelligence from recent xai_personnel_intelligence.
+
+    Weighted average of sentiment_score, weighted by influence_weight and recency.
+    Returns -1.0 to +1.0, or None if no personnel data exists.
+    """
+    now = datetime.now(timezone.utc)
+    cutoff_naive = (now - timedelta(days=days_window)).replace(tzinfo=None)
+
+    rows = db.execute(
+        select(XaiPersonnelIntelligence)
+        .where(
+            XaiPersonnelIntelligence.timestamp >= cutoff_naive,
+            XaiPersonnelIntelligence.sentiment_score.isnot(None),
+        )
+        .order_by(XaiPersonnelIntelligence.timestamp.desc())
+    ).scalars().all()
+
+    if not rows:
+        return None  # No data yet — signal not active
+
+    now_naive = now.replace(tzinfo=None)
+    total_weight = 0.0
+    weighted_sum = 0.0
+
+    for r in rows:
+        sentiment = float(r.sentiment_score) if r.sentiment_score is not None else 0.0
+        influence = float(r.influence_weight) if r.influence_weight is not None else 1.0
+
+        # Recency decay
+        age_days = (now_naive - r.timestamp).days
+        recency = max(0.1, 1.0 - (age_days / days_window))
+
+        # XRP mention boost
+        xrp_boost = 1.5 if r.xrp_mentioned else 1.0
+
+        weight = influence * recency * xrp_boost
+        weighted_sum += sentiment * weight
+        total_weight += weight
+
+    if total_weight == 0:
+        return 0.0
+
+    return round(max(-1.0, min(1.0, weighted_sum / total_weight)), 4)
+
+
 def determine_adoption_phase(ratio: float, xai_score: float) -> str:
     """Classify the current adoption phase."""
     if ratio > 1.0:
@@ -204,6 +251,7 @@ def compute_xai_composite(db: Session) -> dict:
     onchain_score = compute_onchain_utility_score(db)
     partnership_score = compute_partnership_score(db)
     policy_score = compute_policy_pipeline_score(db)
+    personnel_score = compute_personnel_score(db)
 
     # Build available signals — only include those with data
     available = {
@@ -212,6 +260,8 @@ def compute_xai_composite(db: Session) -> dict:
     }
     if policy_score is not None:
         available["policy_pipeline"] = (policy_score, FULL_WEIGHTS["policy_pipeline"])
+    if personnel_score is not None:
+        available["personnel"] = (personnel_score, FULL_WEIGHTS["personnel"])
 
     total_weight = sum(w for _, w in available.values())
 
@@ -246,12 +296,13 @@ def compute_xai_composite(db: Session) -> dict:
     phase = determine_adoption_phase(ratio, xai_score)
 
     policy_rounded = round(policy_score, 4) if policy_score is not None else None
+    personnel_rounded = round(personnel_score, 4) if personnel_score is not None else None
 
     result = {
         "policy_pipeline_score": policy_rounded,
         "partnership_deployment_score": round(partnership_score, 4),
         "onchain_utility_score": round(onchain_score, 4),
-        "personnel_intelligence_score": None,
+        "personnel_intelligence_score": personnel_rounded,
         "xai_score": round(xai_score, 4),
         "utility_to_speculation_ratio": round(ratio, 6),
         "rlusd_market_cap": round(rlusd_cap, 2),
@@ -268,7 +319,7 @@ def compute_xai_composite(db: Session) -> dict:
         "policy_pipeline_score": policy_dec,
         "partnership_deployment_score": Decimal(str(partnership_score)),
         "onchain_utility_score": Decimal(str(onchain_score)),
-        "personnel_intelligence_score": None,
+        "personnel_intelligence_score": Decimal(str(personnel_score)) if personnel_score is not None else None,
         "xai_score": Decimal(str(xai_score)),
         "utility_to_speculation_ratio": Decimal(str(ratio)),
         "rlusd_market_cap": Decimal(str(rlusd_cap)),
@@ -287,9 +338,9 @@ def compute_xai_composite(db: Session) -> dict:
     db.commit()
 
     logger.info(
-        "XAI composite: score=%.4f phase=%s ratio=%.6f partners=%d/%d policy=%s",
+        "XAI composite: score=%.4f phase=%s ratio=%.6f partners=%d/%d policy=%s personnel=%s",
         xai_score, phase, ratio, prod_partners, total_partners,
-        policy_rounded,
+        policy_rounded, personnel_rounded,
     )
 
     return result

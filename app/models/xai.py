@@ -1,7 +1,8 @@
-"""XRP Adoption Intelligence (XAI) models — Phases A + B.
+"""XRP Adoption Intelligence (XAI) models — Phases A + B + C.
 
 Tables: xai_onchain_metrics, xai_composite, xai_partnerships,
-        xai_tracked_entities, xai_event_calendar, xai_policy_events.
+        xai_tracked_entities, xai_event_calendar, xai_policy_events,
+        xai_personnel_intelligence.
 """
 
 from datetime import date, datetime
@@ -13,6 +14,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     DECIMAL,
+    ForeignKey,
     Index,
     Integer,
     JSON,
@@ -214,4 +216,41 @@ class XaiPolicyEvent(Base):
     __table_args__ = (
         UniqueConstraint("source", "title", name="uq_xai_policy_source_title"),
         Index("idx_xai_policy_ts", "timestamp"),
+    )
+
+
+# ---------- Personnel intelligence (Phase C) ----------
+
+class XaiPersonnelIntelligence(Base):
+    """Classified statements from key decision-makers tracked for XRP adoption."""
+
+    __tablename__ = "xai_personnel_intelligence"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    entity_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("xai_tracked_entities.id"), nullable=True
+    )
+    person_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    role: Mapped[str | None] = mapped_column(String(300))
+
+    statement_type: Mapped[str | None] = mapped_column(String(30))  # speech/interview/publication/social_media
+    source_title: Mapped[str] = mapped_column(Text, nullable=False)
+    source_url: Mapped[str | None] = mapped_column(Text)
+
+    # Claude classification scores
+    cross_border_urgency: Mapped[Decimal | None] = mapped_column(DECIMAL(3, 2))
+    dlt_favorability: Mapped[Decimal | None] = mapped_column(DECIMAL(4, 2))
+    stablecoin_stance: Mapped[Decimal | None] = mapped_column(DECIMAL(4, 2))
+    timeline_urgency: Mapped[Decimal | None] = mapped_column(DECIMAL(3, 2))
+    xrp_mentioned: Mapped[bool] = mapped_column(Boolean, default=False)
+    key_quote: Mapped[str | None] = mapped_column(Text)
+    sentiment_score: Mapped[Decimal | None] = mapped_column(DECIMAL(4, 2))
+    influence_weight: Mapped[Decimal | None] = mapped_column(DECIMAL(3, 1))
+
+    created_at: Mapped[datetime | None] = mapped_column(default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("person_name", "source_title", name="uq_xai_personnel_person_source"),
+        Index("idx_xai_personnel_ts", "timestamp"),
     )

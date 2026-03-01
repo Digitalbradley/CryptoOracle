@@ -30,6 +30,7 @@ from app.models.xai import (
     XaiEventCalendar,
     XaiOnchainMetrics,
     XaiPartnership,
+    XaiPersonnelIntelligence,
     XaiPolicyEvent,
     XaiTrackedEntity,
 )
@@ -62,6 +63,7 @@ __all__ = [
     "XaiEventCalendar",
     "XaiOnchainMetrics",
     "XaiPartnership",
+    "XaiPersonnelIntelligence",
     "XaiPolicyEvent",
     "XaiTrackedEntity",
 ]

@@ -25,6 +25,7 @@ from app.models.political_signal import PoliticalSignal
 from app.models.sentiment_data import SentimentData
 from app.models.signal_weights import SignalWeights
 from app.models.ta_indicators import TAIndicators
+from app.models.xai import XaiComposite
 from app.signals.celestial import CelestialEngine
 from app.signals.numerology import compute_daily_numerology
 from app.services.sentiment_fetch import fetch_and_store_current
@@ -75,6 +76,7 @@ class ConfluenceEngine:
             "sentiment": float(row.sentiment_weight),
             "political": float(row.political_weight),
             "macro": float(row.macro_weight),
+            "xai": float(row.xai_weight) if row.xai_weight is not None else 0.0,
         }
 
     def gather_latest_scores(
@@ -189,6 +191,19 @@ class ConfluenceEngine:
             float(macro_row.macro_score) if macro_row and macro_row.macro_score else None
         )
 
+        # XAI: only for XRP-based symbols
+        if "XRP" in symbol.upper():
+            xai_row = db.execute(
+                select(XaiComposite)
+                .order_by(XaiComposite.timestamp.desc())
+                .limit(1)
+            ).scalar_one_or_none()
+            scores["xai_score"] = (
+                float(xai_row.xai_score) if xai_row and xai_row.xai_score is not None else None
+            )
+        else:
+            scores["xai_score"] = None
+
         return scores
 
     def compute_composite(self, scores: dict, weights: dict) -> dict:
@@ -212,6 +227,7 @@ class ConfluenceEngine:
             "sentiment_score": "sentiment",
             "political_score": "political",
             "macro_score": "macro",
+            "xai_score": "xai",
         }
 
         # Filter to available (non-None) layers
@@ -271,6 +287,7 @@ class ConfluenceEngine:
             "sentiment_score": scores.get("sentiment_score"),
             "political_score": scores.get("political_score"),
             "macro_score": scores.get("macro_score"),
+            "xai_score": scores.get("xai_score"),
             "weights": weights,
             "composite_score": composite,
             "signal_strength": signal_strength,
@@ -314,6 +331,7 @@ class ConfluenceEngine:
             "sentiment_score": _to_decimal(result["sentiment_score"]),
             "political_score": _to_decimal(result["political_score"]),
             "macro_score": _to_decimal(result["macro_score"]),
+            "xai_score": _to_decimal(result.get("xai_score")),
             "weights": result["weights"],
             "composite_score": Decimal(str(result["composite_score"])),
             "signal_strength": result["signal_strength"],
@@ -332,6 +350,7 @@ class ConfluenceEngine:
                 "sentiment_score": stmt.excluded.sentiment_score,
                 "political_score": stmt.excluded.political_score,
                 "macro_score": stmt.excluded.macro_score,
+                "xai_score": stmt.excluded.xai_score,
                 "weights": stmt.excluded.weights,
                 "composite_score": stmt.excluded.composite_score,
                 "signal_strength": stmt.excluded.signal_strength,

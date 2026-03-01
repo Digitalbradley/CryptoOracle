@@ -12,6 +12,7 @@ from app.models.xai import (
     XaiEventCalendar,
     XaiOnchainMetrics,
     XaiPartnership,
+    XaiPersonnelIntelligence,
     XaiPolicyEvent,
 )
 
@@ -195,9 +196,39 @@ def get_xai_policies(days: int = 90, db: Session = Depends(get_db)):
     return {"count": len(events), "events": events}
 
 
+@router.get("/api/xai/personnel")
+def get_xai_personnel(days: int = 90, db: Session = Depends(get_db)):
+    """Get recent classified personnel intelligence statements."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    rows = db.execute(
+        select(XaiPersonnelIntelligence)
+        .where(XaiPersonnelIntelligence.timestamp >= cutoff)
+        .order_by(XaiPersonnelIntelligence.timestamp.desc())
+        .limit(50)
+    ).scalars().all()
+
+    statements = []
+    for r in rows:
+        statements.append({
+            "id": r.id,
+            "timestamp": r.timestamp.isoformat(),
+            "person_name": r.person_name,
+            "role": r.role,
+            "statement_type": r.statement_type,
+            "source_title": r.source_title,
+            "source_url": r.source_url,
+            "sentiment_score": str(r.sentiment_score) if r.sentiment_score is not None else None,
+            "influence_weight": str(r.influence_weight) if r.influence_weight is not None else None,
+            "xrp_mentioned": r.xrp_mentioned,
+            "key_quote": r.key_quote,
+        })
+
+    return {"count": len(statements), "statements": statements}
+
+
 @router.post("/api/xai/recompute")
 def recompute_xai(db: Session = Depends(get_db)):
-    """Force XRPL fetch + policy scrape + XAI composite recompute."""
+    """Force XRPL fetch + policy scrape + personnel scrape + XAI composite recompute."""
     results = {}
 
     # 1. Fetch XRPL data
@@ -218,13 +249,23 @@ def recompute_xai(db: Session = Depends(get_db)):
         db.rollback()
         results["policy_scrape"] = {"error": str(exc), "traceback": tb.format_exc()}
 
-    # 3. Recompute XAI composite
+    # 3. Scrape + classify personnel intelligence
+    try:
+        from app.services.xai_personnel_fetch import fetch_and_classify as personnel_classify
+        results["personnel_scrape"] = personnel_classify(db)
+    except Exception as exc:
+        import traceback as tb
+        db.rollback()
+        results["personnel_scrape"] = {"error": str(exc), "traceback": tb.format_exc()}
+
+    # 4. Recompute XAI composite
     try:
         from app.services.xai_signal_service import compute_xai_composite
         composite = compute_xai_composite(db)
         results["xai_score"] = composite["xai_score"]
         results["adoption_phase"] = composite["adoption_phase"]
         results["policy_pipeline_score"] = composite["policy_pipeline_score"]
+        results["personnel_intelligence_score"] = composite["personnel_intelligence_score"]
         results["rlusd_market_cap"] = composite["rlusd_market_cap"]
     except Exception as exc:
         import traceback as tb

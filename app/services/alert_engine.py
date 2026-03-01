@@ -24,6 +24,7 @@ from app.models.political_calendar import PoliticalCalendar
 from app.models.political_news import PoliticalNews
 from app.models.political_signal import PoliticalSignal
 from app.models.sentiment_data import SentimentData
+from app.models.xai import XaiComposite, XaiOnchainMetrics
 from app.services import cycle_tracker
 
 logger = logging.getLogger(__name__)
@@ -470,6 +471,117 @@ class AlertEngine:
 
         return alerts
 
+    def check_xai_alerts(self, db: Session, symbol: str) -> list[dict]:
+        """Check for XAI-specific alerts (XRP only).
+
+        Triggers:
+        - Stability inflection: utility/speculation ratio > 0.5
+        - RLUSD milestone: supply crosses $1B
+        - XAI score breakout: XAI composite > 0.6 or < -0.6
+        - Phase transition: adoption phase changes
+        """
+        alerts = []
+
+        if "XRP" not in symbol.upper():
+            return []
+
+        latest = db.execute(
+            select(XaiComposite)
+            .order_by(XaiComposite.timestamp.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+
+        if not latest:
+            return []
+
+        # XAI score breakout
+        if latest.xai_score is not None:
+            score = float(latest.xai_score)
+            if score >= 0.6:
+                alerts.append({
+                    "symbol": symbol,
+                    "alert_type": "xai_breakout",
+                    "severity": "warning",
+                    "title": f"XAI bullish breakout: {score:+.4f}",
+                    "description": (
+                        f"XAI composite score {score:+.4f} exceeds +0.6 threshold. "
+                        f"Phase: {latest.adoption_phase}."
+                    ),
+                    "trigger_data": {"xai_score": score, "phase": latest.adoption_phase},
+                })
+            elif score <= -0.6:
+                alerts.append({
+                    "symbol": symbol,
+                    "alert_type": "xai_breakout",
+                    "severity": "warning",
+                    "title": f"XAI bearish signal: {score:+.4f}",
+                    "description": (
+                        f"XAI composite score {score:+.4f} below -0.6 threshold. "
+                        f"Phase: {latest.adoption_phase}."
+                    ),
+                    "trigger_data": {"xai_score": score, "phase": latest.adoption_phase},
+                })
+
+        # Utility/speculation ratio milestone
+        if latest.utility_to_speculation_ratio is not None:
+            ratio = float(latest.utility_to_speculation_ratio)
+            if ratio >= 0.5:
+                alerts.append({
+                    "symbol": symbol,
+                    "alert_type": "xai_stability_inflection",
+                    "severity": "critical",
+                    "title": f"XRP stability inflection: U/S ratio at {ratio:.4f}",
+                    "description": (
+                        f"Utility-to-speculation ratio reached {ratio:.4f}. "
+                        "Approaching the 1.0 stability threshold."
+                    ),
+                    "trigger_data": {"ratio": ratio},
+                })
+
+        # RLUSD $1B milestone
+        if latest.rlusd_market_cap is not None:
+            cap = float(latest.rlusd_market_cap)
+            if cap >= 1_000_000_000:
+                alerts.append({
+                    "symbol": symbol,
+                    "alert_type": "xai_rlusd_milestone",
+                    "severity": "warning",
+                    "title": f"RLUSD crosses $1B: ${cap / 1e9:.1f}B",
+                    "description": (
+                        f"RLUSD supply reached ${cap / 1e9:.2f}B — "
+                        "institutional stablecoin adoption milestone."
+                    ),
+                    "trigger_data": {"rlusd_market_cap": cap},
+                })
+
+        # Phase transition (compare to previous composite)
+        previous = db.execute(
+            select(XaiComposite)
+            .order_by(XaiComposite.timestamp.desc())
+            .offset(1)
+            .limit(1)
+        ).scalar_one_or_none()
+
+        if previous and previous.adoption_phase and latest.adoption_phase:
+            if previous.adoption_phase != latest.adoption_phase:
+                alerts.append({
+                    "symbol": symbol,
+                    "alert_type": "xai_phase_transition",
+                    "severity": "critical",
+                    "title": f"XRP adoption phase change: {previous.adoption_phase} → {latest.adoption_phase}",
+                    "description": (
+                        f"XRP adoption phase transitioned from "
+                        f"{previous.adoption_phase.replace('_', ' ')} to "
+                        f"{latest.adoption_phase.replace('_', ' ')}."
+                    ),
+                    "trigger_data": {
+                        "old_phase": previous.adoption_phase,
+                        "new_phase": latest.adoption_phase,
+                    },
+                })
+
+        return alerts
+
     def create_alert(self, db: Session, alert_data: dict) -> bool:
         """Insert an alert into the alerts table.
 
@@ -538,6 +650,7 @@ class AlertEngine:
         all_alerts.extend(self.check_sentiment_alerts(db, symbol))
         all_alerts.extend(self.check_political_alerts(db, symbol))
         all_alerts.extend(self.check_macro_alerts(db, symbol))
+        all_alerts.extend(self.check_xai_alerts(db, symbol))
 
         for alert_data in all_alerts:
             if self.create_alert(db, alert_data):

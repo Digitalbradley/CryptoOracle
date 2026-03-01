@@ -309,6 +309,25 @@ export interface XaiPoliciesResponse {
   events: XaiPolicyEvent[];
 }
 
+export interface XaiPersonnelStatement {
+  id: number;
+  timestamp: string;
+  person_name: string;
+  role: string | null;
+  statement_type: string | null;
+  source_title: string;
+  source_url: string | null;
+  sentiment_score: string | null;
+  influence_weight: string | null;
+  xrp_mentioned: boolean;
+  key_quote: string | null;
+}
+
+export interface XaiPersonnelResponse {
+  count: number;
+  statements: XaiPersonnelStatement[];
+}
+
 // ---------- AI Chat ----------
 export interface ChatMessage {
   role: 'user' | 'assistant';

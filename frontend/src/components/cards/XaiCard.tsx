@@ -1,4 +1,4 @@
-import { useXaiScore, useXaiCalendar, useXaiPolicies } from '../../hooks/useXai';
+import { useXaiScore, useXaiCalendar, useXaiPolicies, useXaiPersonnel, useXaiPartnerships } from '../../hooks/useXai';
 import { parseScore } from '../../types/api';
 import Card from '../ui/Card';
 import LayerBar from '../ui/LayerBar';
@@ -40,14 +40,16 @@ function formatUsd(value: string | null): string {
 
 function impactColor(impact: string | null): string {
   if (impact === 'high') return 'var(--accent-gold)';
-  if (impact === 'medium') return 'var(--text-secondary)';
-  return 'var(--text-muted)';
+  if (impact === 'medium') return 'var(--text-primary)';
+  return 'var(--text-secondary)';
 }
 
 export default function XaiCard() {
   const { data, isLoading } = useXaiScore();
   const { data: calendarData } = useXaiCalendar();
   const { data: policiesData } = useXaiPolicies();
+  const { data: personnelData } = useXaiPersonnel();
+  const { data: partnershipsData } = useXaiPartnerships();
 
   if (isLoading) {
     return (
@@ -77,6 +79,8 @@ export default function XaiCard() {
   const rlusdCap = data.rlusd_market_cap;
   const phase = data.adoption_phase || 'pre_adoption';
   const pIdx = phaseIndex(phase);
+
+  const pipeline = partnershipsData?.pipeline_summary;
 
   return (
     <Card title="XRP Adoption (XAI)" layerColor="#6366f1">
@@ -138,7 +142,7 @@ export default function XaiCard() {
               Utility/Speculation Ratio
             </Tooltip>
           </span>
-          <span className="font-mono text-[10px]" style={{ color: ratio >= 1 ? 'var(--signal-bullish)' : 'var(--text-secondary)' }}>
+          <span className="font-mono text-[10px]" style={{ color: ratio >= 1 ? 'var(--signal-bullish)' : 'var(--text-primary)' }}>
             {ratio.toFixed(4)} / 1.0
           </span>
         </div>
@@ -153,7 +157,7 @@ export default function XaiCard() {
         </div>
       </div>
 
-      {/* Sub-signal bars */}
+      {/* Sub-signal bars — all 4 active */}
       <div className="space-y-0.5">
         <LayerBar
           label="On-Chain"
@@ -167,7 +171,7 @@ export default function XaiCard() {
           score={parseScore(data.partnership_deployment_score)}
           color="#a78bfa"
         />
-        {data.policy_pipeline_score ? (
+        {data.policy_pipeline_score != null ? (
           <LayerBar
             label="Policy"
             tooltip="BIS/FSB/SEC regulatory environment — cross-border payments, DLT favorability, stablecoin stance"
@@ -180,20 +184,36 @@ export default function XaiCard() {
             <span className="text-[10px] italic" style={{ color: 'var(--text-muted)' }}>Awaiting data</span>
           </div>
         )}
-        {data.personnel_intelligence_score ? (
+        {data.personnel_intelligence_score != null ? (
           <LayerBar
             label="Personnel"
-            tooltip="Key decision-maker sentiment analysis"
+            tooltip="Key decision-maker sentiment: BIS/FSB officials, Ripple executives, regulators"
             score={parseScore(data.personnel_intelligence_score)}
             color="#e879f9"
           />
         ) : (
           <div className="flex items-center gap-2 py-1">
             <span className="text-xs w-20 shrink-0" style={{ color: 'var(--text-muted)' }}>Personnel</span>
-            <span className="text-[10px] italic" style={{ color: 'var(--text-muted)' }}>Phase C</span>
+            <span className="text-[10px] italic" style={{ color: 'var(--text-muted)' }}>Awaiting data</span>
           </div>
         )}
       </div>
+
+      {/* Partnership pipeline visualization */}
+      {pipeline && (
+        <div className="mt-3">
+          <p className="text-[10px] uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>
+            Partnership Pipeline
+          </p>
+          <div className="flex items-center gap-1.5">
+            <PipelineStage label="Announced" count={pipeline.announced} color="#94a3b8" />
+            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>→</span>
+            <PipelineStage label="Pilot" count={pipeline.pilot} color="#a78bfa" />
+            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>→</span>
+            <PipelineStage label="Production" count={pipeline.production} color="var(--signal-bullish)" />
+          </div>
+        </div>
+      )}
 
       {/* Key metrics */}
       <div className="mt-3">
@@ -208,6 +228,37 @@ export default function XaiCard() {
         </div>
       </div>
 
+      {/* Recent personnel intelligence */}
+      {personnelData && personnelData.statements.length > 0 && (
+        <div className="mt-3">
+          <p className="text-[10px] uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>
+            Personnel Intel
+          </p>
+          <div className="space-y-1">
+            {personnelData.statements.slice(0, 3).map((s) => {
+              const sentiment = parseScore(s.sentiment_score);
+              return (
+                <div key={s.id} className="flex items-center justify-between">
+                  <span
+                    className="text-[10px] truncate"
+                    style={{
+                      color: sentiment > 0 ? 'var(--signal-bullish)' : sentiment < 0 ? 'var(--signal-bearish)' : 'var(--text-primary)',
+                      maxWidth: '65%',
+                    }}
+                  >
+                    {s.xrp_mentioned && <span style={{ color: '#818cf8' }}>XRP </span>}
+                    {s.person_name}
+                  </span>
+                  <span className="text-[10px] font-mono shrink-0" style={{ color: 'var(--text-secondary)' }}>
+                    {sentiment >= 0 ? '+' : ''}{sentiment.toFixed(2)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Recent policy events */}
       {policiesData && policiesData.events.length > 0 && (
         <div className="mt-3">
@@ -220,14 +271,14 @@ export default function XaiCard() {
                 <span
                   className="text-[10px] truncate"
                   style={{
-                    color: parseScore(ev.policy_impact_score) > 0 ? 'var(--signal-bullish)' : parseScore(ev.policy_impact_score) < 0 ? 'var(--signal-bearish)' : 'var(--text-secondary)',
+                    color: parseScore(ev.policy_impact_score) > 0 ? 'var(--signal-bullish)' : parseScore(ev.policy_impact_score) < 0 ? 'var(--signal-bearish)' : 'var(--text-primary)',
                     maxWidth: '65%',
                   }}
                 >
                   {ev.xrp_mentioned && <span style={{ color: '#818cf8' }}>XRP </span>}
                   {ev.title.length > 50 ? ev.title.slice(0, 50) + '...' : ev.title}
                 </span>
-                <span className="text-[10px] font-mono shrink-0" style={{ color: 'var(--text-muted)' }}>
+                <span className="text-[10px] font-mono shrink-0" style={{ color: 'var(--text-secondary)' }}>
                   {ev.source}
                 </span>
               </div>
@@ -243,12 +294,12 @@ export default function XaiCard() {
             Upcoming Events
           </p>
           <div className="space-y-1">
-            {calendarData.events.slice(0, 3).map((ev) => (
+            {calendarData.events.slice(0, 5).map((ev) => (
               <div key={ev.id} className="flex items-center justify-between">
                 <span className="text-[10px] truncate" style={{ color: impactColor(ev.potential_impact), maxWidth: '70%' }}>
                   {ev.event_name}
                 </span>
-                <span className="text-[10px] font-mono shrink-0" style={{ color: 'var(--text-muted)' }}>
+                <span className="text-[10px] font-mono shrink-0" style={{ color: 'var(--text-secondary)' }}>
                   {ev.event_date}
                 </span>
               </div>
@@ -265,6 +316,15 @@ function MetricItem({ label, value }: { label: string; value: string }) {
     <div className="flex justify-between items-center">
       <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{label}</span>
       <span className="font-mono text-[11px]" style={{ color: 'var(--text-primary)' }}>{value}</span>
+    </div>
+  );
+}
+
+function PipelineStage({ label, count, color }: { label: string; count: number; color: string }) {
+  return (
+    <div className="flex items-center gap-1 px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--bg-elevated)' }}>
+      <span className="font-mono text-[11px] font-bold" style={{ color }}>{count}</span>
+      <span className="text-[9px]" style={{ color: 'var(--text-secondary)' }}>{label}</span>
     </div>
   );
 }

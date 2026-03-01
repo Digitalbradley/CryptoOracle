@@ -287,6 +287,36 @@ def run_xai_policy_update() -> None:
         db.close()
 
 
+def run_xai_personnel_update() -> None:
+    """Scrape BIS/FSB speeches + Ripple blog for personnel intelligence, classify, recompute XAI.
+
+    Runs every 6 hours in its own DB session.
+    """
+    logger.info("XAI personnel update starting...")
+    db = SessionLocal()
+
+    try:
+        # Scrape and classify personnel statements
+        try:
+            from app.services.xai_personnel_fetch import fetch_and_classify
+            result = fetch_and_classify(db)
+            logger.info("XAI personnel fetch: %s", result)
+        except Exception:
+            logger.exception("Error in XAI personnel fetch")
+
+        # Recompute XAI composite (picks up new personnel score)
+        try:
+            from app.services.xai_signal_service import compute_xai_composite
+            result = compute_xai_composite(db)
+            logger.info("XAI composite (post-personnel): score=%.4f", result["xai_score"])
+        except Exception:
+            logger.exception("Error recomputing XAI composite after personnel update")
+
+        logger.info("XAI personnel update complete.")
+    finally:
+        db.close()
+
+
 def start_scheduler() -> None:
     """Start the background scheduler with all jobs."""
     global _scheduler
@@ -356,6 +386,16 @@ def start_scheduler() -> None:
         next_run_time=now,
         id="xai_policy_update",
         name="6-hourly XAI policy scrape + classify",
+    )
+
+    # Every 6 hours: XAI personnel intelligence (BIS/FSB speeches + Ripple blog)
+    _scheduler.add_job(
+        run_xai_personnel_update,
+        "interval",
+        hours=6,
+        next_run_time=now,
+        id="xai_personnel_update",
+        name="6-hourly XAI personnel scrape + classify",
     )
 
     # Daily at 00:05 UTC: celestial + numerology
