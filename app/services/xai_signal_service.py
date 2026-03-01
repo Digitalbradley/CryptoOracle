@@ -135,12 +135,15 @@ def compute_policy_pipeline_score(db: Session, days_window: int = 90) -> float |
     (cross_border_relevance + timeline_urgency) and recency.
     Returns -1.0 to +1.0, or None if no policy data exists.
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days_window)
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=days_window)
+    # Strip timezone for comparison with naive DB timestamps
+    cutoff_naive = cutoff.replace(tzinfo=None)
 
     rows = db.execute(
         select(XaiPolicyEvent)
         .where(
-            XaiPolicyEvent.timestamp >= cutoff,
+            XaiPolicyEvent.timestamp >= cutoff_naive,
             XaiPolicyEvent.policy_impact_score.isnot(None),
         )
         .order_by(XaiPolicyEvent.timestamp.desc())
@@ -149,6 +152,7 @@ def compute_policy_pipeline_score(db: Session, days_window: int = 90) -> float |
     if not rows:
         return None  # No data yet — signal not active
 
+    now_naive = now.replace(tzinfo=None)
     total_weight = 0.0
     weighted_sum = 0.0
 
@@ -158,7 +162,7 @@ def compute_policy_pipeline_score(db: Session, days_window: int = 90) -> float |
         urgency = float(r.timeline_urgency) if r.timeline_urgency is not None else 0.3
 
         # Recency decay: newer events count more
-        age_days = (datetime.now(timezone.utc) - r.timestamp).days
+        age_days = (now_naive - r.timestamp).days
         recency = max(0.1, 1.0 - (age_days / days_window))
 
         # XRP mention boost

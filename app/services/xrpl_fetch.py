@@ -47,6 +47,7 @@ def fetch_and_store(db: Session) -> dict:
     """
     now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
     metrics: dict = {}
+    errors: list[str] = []
 
     # 1. Server info — basic ledger stats
     try:
@@ -55,8 +56,9 @@ def fetch_and_store(db: Session) -> dict:
         metrics["xrpl_tx_count"] = server.get("load", {}).get("txn_count")
         validated = server.get("validated_ledger", {})
         metrics["_seq"] = validated.get("seq")
-    except Exception:
+    except Exception as exc:
         logger.exception("Failed to fetch XRPL server_info")
+        errors.append(f"server_info: {exc}")
 
     # 2. Ledger data — recent ledger for tx counts
     try:
@@ -71,14 +73,20 @@ def fetch_and_store(db: Session) -> dict:
     try:
         gw = _rpc("gateway_balances", [{"account": RLUSD_ISSUER}])
         obligations = gw.get("obligations", {})
+        logger.info("gateway_balances obligations keys: %s", list(obligations.keys()))
         rlusd_supply = Decimal(obligations.get("RLUSD", "0"))
         if rlusd_supply == 0:
             # Try hex currency code
             rlusd_supply = Decimal(obligations.get(RLUSD_CURRENCY, "0"))
-        metrics["rlusd_total_supply"] = rlusd_supply
-    except Exception:
+        if rlusd_supply > 0:
+            metrics["rlusd_total_supply"] = rlusd_supply
+        else:
+            logger.warning("RLUSD supply is 0 — obligations: %s", obligations)
+            metrics["rlusd_total_supply"] = None
+    except Exception as exc:
         logger.exception("Failed to fetch RLUSD supply")
         metrics["rlusd_total_supply"] = None
+        errors.append(f"gateway_balances: {exc}")
 
     # 4. RLUSD trust line count via account_lines (paginated)
     try:
@@ -96,10 +104,11 @@ def fetch_and_store(db: Session) -> dict:
                 break
         metrics["rlusd_trust_line_count"] = trust_count
         metrics["rlusd_unique_holders"] = trust_count  # trust line ≈ holder
-    except Exception:
+    except Exception as exc:
         logger.exception("Failed to fetch RLUSD trust lines")
         metrics["rlusd_trust_line_count"] = None
         metrics["rlusd_unique_holders"] = None
+        errors.append(f"account_lines: {exc}")
 
     # 5. Estimate speculation volume from existing price data
     try:
@@ -179,8 +188,12 @@ def fetch_and_store(db: Session) -> dict:
         metrics.get("utility_to_speculation_ratio"),
     )
 
-    return {
-        "rlusd_supply": str(metrics.get("rlusd_total_supply", "N/A")),
+    result = {
+        "rlusd_supply": str(metrics.get("rlusd_total_supply")) if metrics.get("rlusd_total_supply") is not None else None,
         "trust_lines": metrics.get("rlusd_trust_line_count"),
-        "ratio": str(metrics.get("utility_to_speculation_ratio", "N/A")),
+        "ratio": str(metrics.get("utility_to_speculation_ratio")) if metrics.get("utility_to_speculation_ratio") is not None else None,
+        "tx_count": metrics.get("xrpl_tx_count"),
     }
+    if errors:
+        result["errors"] = errors
+    return result
