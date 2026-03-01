@@ -124,6 +124,10 @@ class XaiPartnership(Base):
         default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
+    __table_args__ = (
+        UniqueConstraint("partner_name", name="uq_xai_partner_name"),
+    )
+
 
 # ---------- Tracked entities (people / institutions) ----------
 
@@ -149,6 +153,10 @@ class XaiTrackedEntity(Base):
 
     created_at: Mapped[datetime | None] = mapped_column(default=datetime.utcnow)
 
+    __table_args__ = (
+        UniqueConstraint("name", "institution", name="uq_xai_entity_name_inst"),
+    )
+
 
 # ---------- Institutional event calendar ----------
 
@@ -170,6 +178,10 @@ class XaiEventCalendar(Base):
 
     created_at: Mapped[datetime | None] = mapped_column(
         default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        UniqueConstraint("event_date", "event_name", name="uq_xai_event_date_name"),
     )
 
 

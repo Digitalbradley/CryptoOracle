@@ -153,9 +153,9 @@ def compute_policy_pipeline_score(db: Session, days_window: int = 90) -> float |
     weighted_sum = 0.0
 
     for r in rows:
-        impact = float(r.policy_impact_score or 0)
-        relevance = float(r.cross_border_relevance or 0.5)
-        urgency = float(r.timeline_urgency or 0.3)
+        impact = float(r.policy_impact_score) if r.policy_impact_score is not None else 0.0
+        relevance = float(r.cross_border_relevance) if r.cross_border_relevance is not None else 0.5
+        urgency = float(r.timeline_urgency) if r.timeline_urgency is not None else 0.3
 
         # Recency decay: newer events count more
         age_days = (datetime.now(timezone.utc) - r.timestamp).days

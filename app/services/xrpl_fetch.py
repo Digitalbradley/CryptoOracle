@@ -25,7 +25,7 @@ XRPL_RPC_URL = "https://xrplcluster.com/"
 RLUSD_ISSUER = "rMxCKbEDwqr76QuheSUMdEGf4B9xJ8m5De"
 RLUSD_CURRENCY = "524C555344000000000000000000000000000000"  # hex-encoded "RLUSD"
 
-TIMEOUT = 20
+TIMEOUT = 30
 
 
 def _rpc(method: str, params: list | None = None) -> dict:
@@ -139,7 +139,8 @@ def fetch_and_store(db: Session) -> dict:
     else:
         metrics["utility_to_speculation_ratio"] = Decimal("0")
 
-    # Store
+    # Store — only upsert fields that have non-null values to avoid
+    # overwriting good data from a previous successful fetch
     row = {
         "timestamp": now,
         "xrpl_tx_count": metrics.get("xrpl_tx_count"),
@@ -156,11 +157,18 @@ def fetch_and_store(db: Session) -> dict:
         "xrp_exchange_reserve": metrics.get("xrp_exchange_reserve"),
     }
 
+    # Only update columns that got actual data (not None) — preserves previous values
+    non_null_keys = [k for k in row if k != "timestamp" and row[k] is not None]
+
     stmt = pg_insert(XaiOnchainMetrics).values([row])
-    stmt = stmt.on_conflict_do_update(
-        index_elements=["timestamp"],
-        set_={k: stmt.excluded.__getattr__(k) for k in row if k != "timestamp"},
-    )
+    if non_null_keys:
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["timestamp"],
+            set_={k: stmt.excluded.__getattr__(k) for k in non_null_keys},
+        )
+    else:
+        stmt = stmt.on_conflict_do_nothing()
+
     db.execute(stmt)
     db.commit()
 

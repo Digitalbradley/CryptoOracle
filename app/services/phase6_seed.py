@@ -163,7 +163,7 @@ INSTITUTIONAL_EVENTS = [
 
 
 def seed_partnerships(db: Session) -> int:
-    """Seed known Ripple partnerships."""
+    """Seed known Ripple partnerships (idempotent via partner_name unique constraint)."""
     count = 0
     for p in KNOWN_PARTNERSHIPS:
         row = {
@@ -178,7 +178,7 @@ def seed_partnerships(db: Session) -> int:
             "notes": "Pre-seeded from XAI spec",
         }
         stmt = pg_insert(XaiPartnership).values([row])
-        stmt = stmt.on_conflict_do_nothing()  # skip if already exists
+        stmt = stmt.on_conflict_do_nothing(constraint="uq_xai_partner_name")
         result = db.execute(stmt)
         count += result.rowcount
     db.commit()
@@ -187,11 +187,11 @@ def seed_partnerships(db: Session) -> int:
 
 
 def seed_tracked_entities(db: Session) -> int:
-    """Seed key tracked people/institutions."""
+    """Seed key tracked people/institutions (idempotent via name+institution unique constraint)."""
     count = 0
     for e in TRACKED_ENTITIES:
         stmt = pg_insert(XaiTrackedEntity).values([e])
-        stmt = stmt.on_conflict_do_nothing()
+        stmt = stmt.on_conflict_do_nothing(constraint="uq_xai_entity_name_inst")
         result = db.execute(stmt)
         count += result.rowcount
     db.commit()
@@ -200,11 +200,11 @@ def seed_tracked_entities(db: Session) -> int:
 
 
 def seed_event_calendar(db: Session) -> int:
-    """Seed institutional event calendar."""
+    """Seed institutional event calendar (idempotent via event_date+event_name unique constraint)."""
     count = 0
     for ev in INSTITUTIONAL_EVENTS:
         stmt = pg_insert(XaiEventCalendar).values([ev])
-        stmt = stmt.on_conflict_do_nothing()
+        stmt = stmt.on_conflict_do_nothing(constraint="uq_xai_event_date_name")
         result = db.execute(stmt)
         count += result.rowcount
     db.commit()
