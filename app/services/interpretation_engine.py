@@ -19,6 +19,13 @@ from app.models.numerology_daily import NumerologyDaily
 from app.models.political_signal import PoliticalSignal
 from app.models.sentiment_data import SentimentData
 from app.models.ta_indicators import TAIndicators
+from app.models.xai import (
+    XaiComposite,
+    XaiOnchainMetrics,
+    XaiPartnership,
+    XaiPersonnelIntelligence,
+    XaiPolicyEvent,
+)
 from app.services.confluence_engine import ConfluenceEngine
 
 logger = logging.getLogger(__name__)
@@ -41,14 +48,21 @@ Respond in this exact JSON format (no markdown fences):
     "political": "one sentence on political (only if data present)",
     "macro": "one sentence on macro (only if data present)",
     "celestial": "one sentence on celestial (only if data present)",
-    "numerology": "one sentence on numerology (only if data present)"
+    "numerology": "one sentence on numerology (only if data present)",
+    "xai": "one sentence on XRP Adoption Intelligence (only if data present)"
   },
   "watch": "one key thing to watch for next",
   "bias": "one of: strongly_bullish, bullish, cautiously_bullish, neutral, cautiously_bearish, bearish, strongly_bearish"
 }
 
 Only include layers in the "layers" object that have actual data (non-null scores). \
-Keep each layer insight to one sentence. Be direct and actionable.\
+Keep each layer insight to one sentence. Be direct and actionable.
+
+For XRP symbols: The XAI (XRP Adoption Intelligence) layer tracks institutional \
+adoption via 4 sub-signals — on-chain utility (RLUSD, XRPL metrics), partnership \
+pipeline, regulatory policy, and personnel intelligence. The utility-to-speculation \
+ratio is a key metric: ratio > 1.0 means utility exceeds speculation (stability \
+inflection point). Reference specific XAI data when present.\
 """
 
 
@@ -220,7 +234,109 @@ class InterpretationEngine:
                 "numerology_score": _f(num_row.numerology_score),
             }
 
+        # XAI (XRP Adoption Intelligence) — only for XRP symbols
+        if "XRP" in symbol.upper():
+            self._gather_xai_context(db, context)
+
         return context
+
+    def _gather_xai_context(self, db: Session, context: dict) -> None:
+        """Add XAI-specific data to the context dict."""
+        # Latest composite score
+        xai_row = db.execute(
+            select(XaiComposite)
+            .order_by(XaiComposite.timestamp.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+
+        if xai_row:
+            context["xai"] = {
+                "xai_score": _f(xai_row.xai_score),
+                "adoption_phase": xai_row.adoption_phase,
+                "onchain_utility_score": _f(xai_row.onchain_utility_score),
+                "partnership_deployment_score": _f(xai_row.partnership_deployment_score),
+                "policy_pipeline_score": _f(xai_row.policy_pipeline_score),
+                "personnel_intelligence_score": _f(xai_row.personnel_intelligence_score),
+                "utility_to_speculation_ratio": _f(xai_row.utility_to_speculation_ratio),
+                "rlusd_market_cap": _f(xai_row.rlusd_market_cap),
+                "active_partnership_count": xai_row.active_partnership_count,
+                "partnerships_in_production": xai_row.partnerships_in_production,
+            }
+
+        # On-chain utility metrics
+        onchain_row = db.execute(
+            select(XaiOnchainMetrics)
+            .order_by(XaiOnchainMetrics.timestamp.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+
+        if onchain_row:
+            context["xai_onchain"] = {
+                "rlusd_total_supply": _f(onchain_row.rlusd_total_supply),
+                "rlusd_trust_line_count": onchain_row.rlusd_trust_line_count,
+                "xrpl_tx_count": onchain_row.xrpl_tx_count,
+                "xrpl_active_addresses": onchain_row.xrpl_active_addresses,
+                "utility_to_speculation_ratio": _f(onchain_row.utility_to_speculation_ratio),
+                "xrp_exchange_reserve": _f(onchain_row.xrp_exchange_reserve),
+            }
+
+        # Partnership pipeline summary
+        partnerships = db.execute(
+            select(XaiPartnership).order_by(XaiPartnership.partner_weight.desc())
+        ).scalars().all()
+
+        if partnerships:
+            stages = {"announced": [], "pilot": [], "production": []}
+            for p in partnerships:
+                if p.pipeline_stage in stages:
+                    stages[p.pipeline_stage].append(p.partner_name)
+            context["xai_partnerships"] = {
+                "total": len(partnerships),
+                "announced": stages["announced"],
+                "pilot": stages["pilot"],
+                "production": stages["production"],
+            }
+
+        # Recent policy events (top 5)
+        from datetime import timedelta
+        cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+        policy_rows = db.execute(
+            select(XaiPolicyEvent)
+            .where(XaiPolicyEvent.timestamp >= cutoff)
+            .order_by(XaiPolicyEvent.timestamp.desc())
+            .limit(5)
+        ).scalars().all()
+
+        if policy_rows:
+            context["xai_recent_policy"] = [
+                {
+                    "source": r.source,
+                    "title": r.title,
+                    "policy_impact_score": _f(r.policy_impact_score),
+                    "xrp_mentioned": r.xrp_mentioned,
+                }
+                for r in policy_rows
+            ]
+
+        # Recent personnel intelligence (top 5)
+        personnel_rows = db.execute(
+            select(XaiPersonnelIntelligence)
+            .where(XaiPersonnelIntelligence.timestamp >= cutoff)
+            .order_by(XaiPersonnelIntelligence.timestamp.desc())
+            .limit(5)
+        ).scalars().all()
+
+        if personnel_rows:
+            context["xai_recent_personnel"] = [
+                {
+                    "person_name": r.person_name,
+                    "role": r.role,
+                    "sentiment_score": _f(r.sentiment_score),
+                    "xrp_mentioned": r.xrp_mentioned,
+                    "key_quote": r.key_quote[:200] if r.key_quote else None,
+                }
+                for r in personnel_rows
+            ]
 
     def _call_claude(
         self, symbol: str, timeframe: str, context: dict
